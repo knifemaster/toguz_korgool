@@ -1,4 +1,4 @@
 # toguz_korgool
-toguz korgool is board game where two players participate, like chess,
+toguz korgool is board game,
 This project will consist of a server part and a client part.
 
