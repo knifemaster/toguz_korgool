@@ -19,12 +19,12 @@ add_executable(Toguz_korgool  ${SOURCE_DIR}/main.cpp)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIR})
 
-find_package(Boost REQUIRED COMPONENTS system filesystem date_time)
+find_package(Boost REQUIRED COMPONENTS system date_time)
 
 
 include_directories(${Boost_INCLUDE_DIRS})
 
 
-target_link_libraries(${PROJECT_NAME} Boost::filesystem ${Boost_LIBRARIES})
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 
 
