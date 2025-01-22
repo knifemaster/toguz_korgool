@@ -16,10 +16,7 @@ class Board {
 
 	public:
 		Board(size_t size, int ball_count) {
-		//	player1.reserve(size);
-		//	player2.reserve(size);
 
-		//	for ()
 		
 		}
 
@@ -31,7 +28,7 @@ class Board {
 			std::cout << "calling copy constructor" << std::endl;
 		}
 
-		Board& operator=(Board other) {
+		Board& operator=(Board& other) {
 			player1 = other.player1;
 			player2 = other.player2;
 
@@ -71,7 +68,10 @@ class Board {
 
 int main() {
 
+	//Board board2(9, 9);
 	Board board(9, 9);
+	Board board2(board);
+	board2 = board;
 
 	board.print_boards();
 
