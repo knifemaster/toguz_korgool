@@ -22,9 +22,27 @@ class Board {
 		//	for ()
 		
 		}
-		//std::vector<int> get_board() {
+
+		Board(Board& other) {
 		
-		//}
+			player1 = other.player1;
+			player2 = other.player2;
+
+			std::cout << "calling copy constructor" << std::endl;
+		}
+
+		Board& operator=(Board other) {
+			player1 = other.player1;
+			player2 = other.player2;
+
+			//std::swap(player1, other.player1);
+			//std::swap(player2, other.player2);
+			std::cout << "copy assignment" << std::endl;
+
+			return *this;
+		}
+
+
 		std::vector<int>& get_player1_board() {
 			return player1;
 		}
