@@ -59,17 +59,21 @@ class Board {
 			std::cout << std::endl;
 		}
 
+		void add_to_cells(int position, int count_balls) {
+			
+
+		}
+
 		void move(int position, bool color) {
 			// color black(false) or white(true)
 		
 			if (color) {
-				std::cout << player1[9 - position] << std::endl;
-				//player1[9 - position] = 0;
-				int count = player1[9 - position];
-				player1[9 - position] = 0;
-				int k = count - (9 - position);
+				std::cout << player1[cell_count - position] << std::endl;
+				int count = player1[cell_count - position];
+				player1[cell_count - position] = 0;
+				int k = count - (cell_count - position);
 				std::cout << "k = " << k << std::endl;
-				for (int i = 9 - position; i >= 0; --i) {
+				for (int i = cell_count - position; i >= 0; --i) {
 					player1[i]++;
 
 				}
@@ -86,6 +90,8 @@ class Board {
 		}
 
 	private:
+		//std::vector<unsigned short> or byte
+		int cell_count = 9;
 		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
 
