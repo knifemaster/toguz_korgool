@@ -59,8 +59,34 @@ class Board {
 			std::cout << std::endl;
 		}
 
+		void move(int position, bool color) {
+			// color black(false) or white(true)
+		
+			if (color) {
+				std::cout << player1[9 - position] << std::endl;
+				//player1[9 - position] = 0;
+				int count = player1[9 - position];
+				player1[9 - position] = 0;
+				int k = count - (9 - position);
+				std::cout << "k = " << k << std::endl;
+				for (int i = 9 - position; i >= 0; --i) {
+					player1[i]++;
+
+				}
+
+				for (int i = 0; i < k; i++) {
+					player2[i]++;	
+				}
+
+			}
+			else {
+				
+			}
+
+		}
+
 	private:
-		std::vector<int> player1 {9, 9, 9, 9, 9, 9, 9, 9, 9};
+		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
 
 };
@@ -70,10 +96,12 @@ int main() {
 
 	//Board board2(9, 9);
 	Board board(9, 9);
-	Board board2(board);
-	board2 = board;
+	//Board board2(board);
+	//board2 = board;
 
+	board.move(4, true);
 	board.print_boards();
+	//board.print_boards();
 
 	return 0;
 }
