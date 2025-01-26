@@ -59,10 +59,11 @@ class Board {
 			std::cout << std::endl;
 		}
 
-		void add_to_cells(int position, int count_balls) {
-			
+		//int add_to_cells(int position, int count_balls) {
+				
+		//	for (int i = position; i < )	
 
-		}
+		//}
 
 		void move(int position, bool color) {
 			// color black(false) or white(true)
@@ -94,6 +95,8 @@ class Board {
 		int cell_count = 9;
 		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
+		std::vector<bool> closed1 {false, false, false, false, false, false, false, false, false};
+		std::vector<bool> closed2 {false, false, false, false, false, false, false, false, false};
 
 };
 
@@ -102,7 +105,7 @@ int main() {
 
 	//Board board2(9, 9);
 	Board board(9, 9);
-	//Board board2(board);
+
 	//board2 = board;
 
 	board.move(4, true);
