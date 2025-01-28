@@ -1,7 +1,8 @@
 #include <iostream>
 #include <vector>
 #include <array>
-
+#include <utility>
+#include <optional>
 
 enum class CellType {
 	TOGUZ_KORGOOL,
@@ -95,8 +96,12 @@ class Board {
 		int cell_count = 9;
 		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
-		std::vector<bool> closed1 {false, false, false, false, false, false, false, false, false};
-		std::vector<bool> closed2 {false, false, false, false, false, false, false, false, false};
+		std::vector<bool> ace1 {false, false, false, false, false, false, false, false, false};
+		std::vector<bool> ace2 {false, false, false, false, false, false, false, false, false};
+		std::vector<bool> ace_position {false, false, false, false, false, false, false, false, false};
+		std::vector<bool> ace_position2 {false, false, false, false, false, false, false, false, false};
+		
+		std::vector<std::optional<bool>> ace;	
 
 };
 
