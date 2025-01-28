@@ -96,10 +96,12 @@ class Board {
 		int cell_count = 9;
 		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
-		std::vector<bool> ace1 {false, false, false, false, false, false, false, false, false};
-		std::vector<bool> ace2 {false, false, false, false, false, false, false, false, false};
-		std::vector<bool> ace_position {false, false, false, false, false, false, false, false, false};
-		std::vector<bool> ace_position2 {false, false, false, false, false, false, false, false, false};
+		//std::vector<bool> ace1 {false, false, false, false, false, false, false, false, false};
+		//std::vector<bool> ace2 {false, false, false, false, false, false, false, false, false};
+		
+		std::vector<std::optional<bool>> ace1 {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
+		//std::vector<bool> ace_position {false, false, false, false, false, false, false, false, false};
+		//std::vector<bool> ace_position2 {false, false, false, false, false, false, false, false, false};
 		
 		std::vector<std::optional<bool>> ace;	
 
