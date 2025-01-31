@@ -60,11 +60,22 @@ class Board {
 			std::cout << std::endl;
 		}
 
-		//int add_to_cells(int position, int count_balls) {
-				
-		//	for (int i = position; i < )	
+		int add_to_cells(int position, int count_balls, bool is_white) {
+			if (is_white) {
+				for (int i = position; i >= 0; i--) {
+					player1[i]++;				
+				}
+			} else {
+				for (int i = position; i <= player2.size(); i++) {
+					player2[i]++;
+				}
+			
+			}
 
-		//}
+
+			for (int i = position; i < )	
+
+		}
 
 		void move(int position, bool color) {
 			// color black(false) or white(true)
