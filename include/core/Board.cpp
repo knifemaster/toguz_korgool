@@ -60,7 +60,16 @@ class Board {
 			std::cout << std::endl;
 		}
 
-		int add_to_cells(int position, int count_balls, bool is_white) {
+		int add_to_cells(int position, int& count_balls, bool is_white) {
+			int k;
+			
+			if (count_balls >= 9) {
+				k = count_balls - 9;	
+			}
+			else {
+				k = count_balls;
+			}
+
 			if (is_white) {
 				for (int i = position; i >= 0; i--) {
 					player1[i]++;				
