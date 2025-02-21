@@ -62,6 +62,7 @@ class Board {
 
 		int add_to_cells(int position, int& count_balls, bool is_white) {
 			int k;
+			int counter = 0;
 			
 			if (count_balls >= 9) {
 				k = count_balls - 9;	
@@ -72,6 +73,8 @@ class Board {
 
 			if (is_white) {
 				for (int i = position; i >= 0; i--) {
+					if (counter)
+					counter++;
 					player1[i]++;				
 				}
 			} else {
@@ -82,19 +85,34 @@ class Board {
 			}
 
 
-			for (int i = position; i < )	
+			//for (int i = position; i < )	
 
 		}
 
 		void move(int position, bool color) {
 			// color black(false) or white(true)
-		
+				
 			if (color) {
 				std::cout << player1[cell_count - position] << std::endl;
 				int count = player1[cell_count - position];
 				player1[cell_count - position] = 0;
 				int k = count - (cell_count - position);
 				std::cout << "k = " << k << std::endl;
+				
+				bool color_side = color;
+
+				while (count > 0) {+
+			
+					std::cout << count << std::endl;
+					count -= 9;
+					std::cout << count << std::endl;
+					std::cout << "%" << count % 9 << std::endl;
+					//int add_to_cells(int position, int& count_balls, bool is_white) {
+
+				
+				}
+				
+				
 				for (int i = cell_count - position; i >= 0; --i) {
 					player1[i]++;
 
