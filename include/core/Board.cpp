@@ -101,7 +101,14 @@ class Board {
 				
 				bool color_side = color;
 
-				while (count > 0) {+
+				while (count > 0) {
+					if (color_side) {
+						std::cout << "white" << std::endl;
+						color_side = !color_side;
+					} else {
+						std::cout << "black" << std::endl;
+						color_side = !color_side;
+					}
 			
 					std::cout << count << std::endl;
 					count -= 9;
