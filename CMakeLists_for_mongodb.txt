@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.10)
+project(MyMongoDBProject)
+
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+
+set(MONGODB_DIR "/usr/local")
+
+
+include_directories(${MONGODB_DIR}/include)
+
+
+link_directories(${MONGODB_DIR}/lib)
+
+
+set(SOURCES src/main.cpp)
+
+
+add_executable(MyMongoDBProject ${SOURCES})
+
+
+target_link_libraries(MyMongoDBProject
+    ${MONGODB_DIR}/lib/libmongocxx.so
+    ${MONGODB_DIR}/lib/libbsoncxx.so
+    ${MONGODB_DIR}/lib/libmongoc-1.0.so
+    ${MONGODB_DIR}/lib/libbson-1.0.so
+)
+
+
