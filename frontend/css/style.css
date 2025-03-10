@@ -19,3 +19,14 @@ body {
 
 }
 
+
+
+.h2_register {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    text-align: left;
+    margin: 10px 0 5px;
+}
