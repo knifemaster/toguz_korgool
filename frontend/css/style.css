@@ -30,3 +30,27 @@ label {
     text-align: left;
     margin: 10px 0 5px;
 }
+
+#username, #email, #password {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 15px;
+    border:  1px solid #ccc;
+    border-radius: 4px;
+}
+
+#submit_btn {
+    width: 100%;
+    padding: 10px;
+    background: #28a745;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+
+}
+
+#submit_btn:hover {
+    background: #218838;
+}
+
