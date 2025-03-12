@@ -7,3 +7,13 @@
 #include <iostream>
 #include <string>
 
+
+class MongoDBClient {
+public:
+    
+    MongoDBClient(const std::string& uri_str, const std::string& db_name, const std::string& collection_name)
+        : instance_{}, client_{mongocxx::uri{uri_str}}, db_{client_[db_name]}, collection_{db_[collection_name]} {
+        std::cout << "Connected to MongoDB!" << std::endl;
+    }
+
+
