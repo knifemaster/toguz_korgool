@@ -32,3 +32,15 @@ public:
             return false;
         }
     }
+
+	    void find_documents(const bsoncxx::document::view_or_value& filter = {}) {
+        try {
+            auto cursor = collection_.find(filter);
+            for (auto&& doc : cursor) {
+                std::cout << "Found document: " << bsoncxx::to_json(doc) << std::endl;
+            }
+        } catch (const mongocxx::exception& e) {
+            std::cerr << "MongoDB error: " << e.what() << std::endl;
+        }
+    }
+
