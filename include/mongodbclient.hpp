@@ -55,3 +55,21 @@ public:
         }
     }
 
+   bool delete_documents(const bsoncxx::document::view_or_value& filter) {
+        try {
+            auto result = collection_.delete_many(filter);
+            std::cout << "Deleted " << result->deleted_count() << " documents." << std::endl;
+            return true;
+        } catch (const mongocxx::exception& e) {
+            std::cerr << "MongoDB error: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
+private:
+    mongocxx::instance instance_;  // Экземпляр MongoDB (требуется для работы драйвера)
+    mongocxx::client client_;      // Клиент для подключения к MongoDB
+    mongocxx::database db_;        // База данных
+    mongocxx::collection collection_;  // Коллекция
+};
+
