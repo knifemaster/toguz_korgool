@@ -25,4 +25,33 @@ class DotEnv {
             }
         }
 
+   public:
 
+        DotEnv(const std::string& filePath = ".env") {
+            std::ifstream file(filePath);
+            if (!file.is_open()) {
+                std::cerr << "Error: Could not open .env file!" << std::endl;
+                return;
+            }
+            parseDotEnv(filePath);
+            load();
+        }
+
+        void load() {
+            for (const auto& [key, value] : envMap) {
+                setenv(key.c_str(), value.c_str(), 1);
+            }
+        }
+
+        std::string get(const std::string& key, const std::string& defaultValue = "") const {
+            auto it = envMap.find(key);
+            if (it != envMap.end()) {
+                return it->second;
+            }
+            return defaultValue;
+        }
+
+        bool has(const std::string& key) const {
+            return envMap.find(key) != envMap.end();
+        }
+};
