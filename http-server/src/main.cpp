@@ -16,8 +16,22 @@
 #include <mongodbclient.hpp>
 #include <chrono>
 #include <sha256.hpp>
+#include <token_generator.hpp>
+#include <email_sender.hpp>
+
 
 int main() {
+
+    try {
+
+        TokenGenerator tokenGenerator(16, std::chrono::seconds(10));
+
+        std::string token = tokenGenerator.generateToken();
+        std::cout << "Сгенерированный токен: " << token << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
+
 
 	DotEnv env;
 
@@ -106,6 +120,57 @@ int main() {
 	});
 
 
+/*
+	svr.Get("/reset/:token", [&](const httplib::Request& req, httplib::Response& res) {
+		auto reset_token = req.path_params.at("token");
+		
+		//res.set_content(user_id, "text/plain");
+		std::cout << reset_token << std::endl;
+	
+
+	});
+
+
+
+	svr.Post("/reset_pass", [&](const httplib::Request& req, httplib::Response& res) {
+		std::string email = req.get_param_value("email");
+		std::string token_for_reset;
+
+		
+		try {
+        ///TokenGenerator tokenGenerator;
+
+			std::string token = tokenGenerator.generateToken(16);
+			token_for_reset = token;
+			std::cout << "Сгенерированный токен: " << token << std::endl;
+		} catch (const std::exception& e) {
+			std::cerr << e.what() << std::endl;
+		}
+
+		std::string url = + "http://localhost:8080/"+token_for_reset;
+
+		//отправка email
+		std::string from = "";
+		std::string to = email;
+		std::string username = "";
+		std::string password = "";
+
+		EmailSender sender(from, to, username, password);
+
+		std::string subject = "Password reset from toguz korgool";
+		std::string body = url;
+
+		if (sender.send(subject, body)) {
+			std::cout << "Email sent" << std::endl;
+		}
+		else {
+			std::cout << "failed to sent email" << std::endl;
+		}
+		
+
+	});
+
+*/
 
 	std::cout << "Server started at http://localhost:8080\n";
 	svr.listen("127.0.0.1", 8080);
