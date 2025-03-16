@@ -69,3 +69,20 @@ public:
         return true;
     }
 
+
+    void removeToken(const std::string& token) {
+        tokens.erase(token);
+    }
+
+    void cleanupExpiredTokens() {
+    	auto now = std::chrono::system_clock::now();
+	for (auto it = tokens.begin(); it != tokens.end();) {
+		if (now - it->second > ttl) {
+			it = tokens.erase(it);
+		} else {
+			++it;
+		}
+	}
+    }
+};
+
