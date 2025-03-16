@@ -27,3 +27,23 @@ public:
     }
 
 
+    std::string generateToken() {
+	std::lock_guard<std::mutex> lock(tokens_mutex);
+
+        unsigned char buffer[tokenLength];
+        if (RAND_bytes(buffer, tokenLength) != 1) {
+            throw std::runtime_error("Ошибка генерации случайных данных");
+        }
+
+        std::stringstream ss;
+        for (size_t i = 0; i < tokenLength; ++i) {
+            ss << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[i];
+        }
+
+        std::string token = ss.str();
+
+        tokens[token] = std::chrono::system_clock::now();
+
+        return token;
+    }
+
