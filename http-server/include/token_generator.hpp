@@ -47,3 +47,25 @@ public:
         return token;
     }
 
+
+    bool isValidToken(const std::string& token) {
+	std::lock_guard<std::mutex> lock(tokens_mutex);
+
+	auto it = tokens.find(token);
+        if (it == tokens.end()) {
+            return false; // Токен не найден
+        }
+
+ 
+        auto now = std::chrono::system_clock::now();
+        auto tokenCreationTime = it->second;
+        auto elapsedTime = now - tokenCreationTime;
+
+        if (elapsedTime > ttl) {
+            tokens.erase(it);
+            return false;
+        }
+
+        return true;
+    }
+
