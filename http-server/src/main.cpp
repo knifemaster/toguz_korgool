@@ -20,6 +20,37 @@
 #include <email_sender.hpp>
 
 
+std::string read_file(const std::string filename) {
+	std::ifstream file(filename, std::ios::binary);
+
+	if(!file.is_open()) {
+		throw std::runtime_error("Couldn't open file " + filename);
+	
+	}
+	std::stringstream buffer;
+	buffer << file.rdbuf();
+	return buffer.str();
+
+}
+
+std::string get_mime_type(const std::string& file_path) {
+    if (file_path.find(".html") != std::string::npos) {
+        return "text/html";
+    } else if (file_path.find(".css") != std::string::npos) {
+        return "text/css";
+    } else if (file_path.find(".js") != std::string::npos) {
+        return "application/javascript";
+    } else if (file_path.find(".png") != std::string::npos) {
+        return "image/png";
+    } else if (file_path.find(".jpg") != std::string::npos) {
+        return "image/jpeg";
+    } else {
+        return "text/plain";
+    }
+}
+
+
+
 int main() {
 
 	TokenGenerator tokenGenerator(16, std::chrono::seconds(600));
@@ -117,12 +148,30 @@ int main() {
 	});
 
 
+	svr.Get("/styles.css", [](const httplib::Request& req, httplib::Response& res) {
+       	try {
+           		std::string css_content = read_file("styles.css");
+           		res.set_content(css_content, get_mime_type("styles.css"));
+       	} catch (const std::exception& e) {
+           	res.status = 500;
+           //	res.set_content("Internal Server Error: " + std::string(e.what()), "text/plain");
+     	}
+    });
+
 
 	svr.Get("/reset/:token", [&tokenGenerator](const httplib::Request& req, httplib::Response& res) {
 		auto reset_token = req.path_params.at("token");
 		
 		if (tokenGenerator.isValidToken(reset_token)) {
-            std::cout << "Токен действителен." << std::endl;
+			std::string html_content = read_file("reset_password.html");
+            res.set_content(html_content, get_mime_type("reset_password.html"));
+
+			std::string css_content = read_file("styles.css");
+           	res.set_content(css_content, get_mime_type("styles.css"));
+
+			res.status = 200;
+            
+			std::cout << "Токен действителен." << std::endl;
         } else {
             std::cout << "Токен недействителен." << std::endl;
         }
