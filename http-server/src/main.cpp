@@ -22,29 +22,26 @@
 
 int main() {
 
+	TokenGenerator tokenGenerator(16, std::chrono::seconds(600));
     try {
-
-        TokenGenerator tokenGenerator(16, std::chrono::seconds(10));
-
         std::string token = tokenGenerator.generateToken();
         std::cout << "Сгенерированный токен: " << token << std::endl;
     } catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
     }
 
-
 	DotEnv env;
 
 	std::string dbUrl = env.get("DATABASE_URL");
 	std::string database_name = env.get("DATABASE");
 	std::string collection = env.get("COLLECTION");
-
+	
 	MongoDBClient client(dbUrl, database_name, collection);
 
 	httplib::Server svr;
 
 
-	svr.Post("/register", [&](const httplib::Request& req, httplib::Response& res) {
+	svr.Post("/register", [&client](const httplib::Request& req, httplib::Response& res) {
 			const std::string username = req.get_param_value("username");
 			std::string password = req.get_param_value("password");
 			std::string email = req.get_param_value("email");
@@ -84,8 +81,8 @@ int main() {
 	});
 
 
-	svr.Post("/login", [&](const httplib::Request& req, httplib::Response& res) {
-		
+	svr.Post("/login", [&client](const httplib::Request& req, httplib::Response& res) {
+
 			std::string email = req.get_param_value("email");
 			std::string password = req.get_param_value("password");
 
@@ -120,11 +117,15 @@ int main() {
 	});
 
 
-/*
-	svr.Get("/reset/:token", [&](const httplib::Request& req, httplib::Response& res) {
+
+	svr.Get("/reset/:token", [&tokenGenerator](const httplib::Request& req, httplib::Response& res) {
 		auto reset_token = req.path_params.at("token");
 		
-		//res.set_content(user_id, "text/plain");
+		if (tokenGenerator.isValidToken(reset_token)) {
+            std::cout << "Токен действителен." << std::endl;
+        } else {
+            std::cout << "Токен недействителен." << std::endl;
+        }
 		std::cout << reset_token << std::endl;
 	
 
@@ -132,33 +133,21 @@ int main() {
 
 
 
-	svr.Post("/reset_pass", [&](const httplib::Request& req, httplib::Response& res) {
-		std::string email = req.get_param_value("email");
-		std::string token_for_reset;
+	svr.Post("/reset_pass", [&env, &tokenGenerator](const httplib::Request& req, httplib::Response& res) {
 
-		
-		try {
-        ///TokenGenerator tokenGenerator;
-
-			std::string token = tokenGenerator.generateToken(16);
-			token_for_reset = token;
-			std::cout << "Сгенерированный токен: " << token << std::endl;
-		} catch (const std::exception& e) {
-			std::cerr << e.what() << std::endl;
-		}
-
-		std::string url = + "http://localhost:8080/"+token_for_reset;
+		std::string token_for_reset = tokenGenerator.generateToken();
+		std::string url = + "http://localhost:8080/reset/"+token_for_reset;
 
 		//отправка email
-		std::string from = "";
-		std::string to = email;
-		std::string username = "";
-		std::string password = "";
-
+		std::string from = env.get("EMAIL_FOR_SEND");
+		std::string to = req.get_param_value("email");
+		std::string username = env.get("EMAIL_FOR_SEND");
+		std::string password = env.get("PASSWORD_FOR_EMAIL");	
+		
 		EmailSender sender(from, to, username, password);
 
 		std::string subject = "Password reset from toguz korgool";
-		std::string body = url;
+		std::string body = "Перейдите по ссылке для сброса пароля " + url;
 
 		if (sender.send(subject, body)) {
 			std::cout << "Email sent" << std::endl;
@@ -170,7 +159,7 @@ int main() {
 
 	});
 
-*/
+
 
 	std::cout << "Server started at http://localhost:8080\n";
 	svr.listen("127.0.0.1", 8080);
