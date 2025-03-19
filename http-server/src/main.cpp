@@ -51,6 +51,26 @@ std::string get_mime_type(const std::string& file_path) {
 
 
 
+bool is_user_agent_browser(const std::string& user_agent) {
+	    //auto user_agent = req.get_header_value("User-Agent");
+		std::cout << "клиент зашел с " << user_agent << std::endl;
+
+        if (user_agent.find("Mozilla") != std::string::npos ||
+            user_agent.find("Chrome") != std::string::npos ||
+            user_agent.find("Safari") != std::string::npos ||
+            user_agent.find("Edge") != std::string::npos ||
+            user_agent.find("Opera") != std::string::npos) {
+			
+			return true;
+		 //   res.set_content("Hello, browser user!", "text/plain");
+        } else {
+			return false;
+		 //   res.set_content("Hello, non-browser client!", "text/plain");
+		}
+}
+
+
+
 int main() {
 
 	TokenGenerator tokenGenerator(16, std::chrono::seconds(600));
