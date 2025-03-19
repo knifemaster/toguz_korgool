@@ -50,7 +50,6 @@ std::string get_mime_type(const std::string& file_path) {
 }
 
 
-
 bool is_user_agent_browser(const std::string& user_agent) {
 	    //auto user_agent = req.get_header_value("User-Agent");
 		std::cout << "клиент зашел с " << user_agent << std::endl;
@@ -71,6 +70,7 @@ bool is_user_agent_browser(const std::string& user_agent) {
 
 
 
+
 int main() {
 
 	TokenGenerator tokenGenerator(16, std::chrono::seconds(600));
@@ -87,12 +87,24 @@ int main() {
 	std::string database_name = env.get("DATABASE");
 	std::string collection = env.get("COLLECTION");
 	
+	std::unordered_map <std::string, std::string> emails_for_reset;
+
+
 	MongoDBClient client(dbUrl, database_name, collection);
 
 	httplib::Server svr;
 
 
 	svr.Post("/register", [&client](const httplib::Request& req, httplib::Response& res) {
+
+			if (is_user_agent_browser(req.get_header_value("User-Agent"))) {
+				std::cout << "browser" << std::endl;
+
+			} else {
+
+
+			}
+
 			const std::string username = req.get_param_value("username");
 			std::string password = req.get_param_value("password");
 			std::string email = req.get_param_value("email");
@@ -168,6 +180,80 @@ int main() {
 	});
 
 
+	svr.Post("/save_password", [&client](const httplib::Request& req, httplib::Response& res) {
+		
+		auto email = req.get_param_value("email");
+		auto new_password = req.get_param_value("password");
+		auto confirm_password = req.get_param_value("confirm_password");
+
+		//auto token = req.get_header_value("token");
+		std::cout << "|email " << email << std::endl;
+		std::cout << "|password " << new_password << std::endl;
+		std::cout << "|confirm" << confirm_password << std::endl;
+
+		if (new_password == confirm_password) {
+			
+			//SHA256 sha256;
+			//std::string cipher_password = sha256.hash(new_password);
+
+			auto filter = bsoncxx::builder::stream::document{}
+						<< "email" << email
+						<< bsoncxx::builder::stream::finalize;
+
+			auto update = bsoncxx::builder::stream::document{}
+						<< "$set" << bsoncxx::builder::stream::open_document
+						<< "password" << new_password
+						<< bsoncxx::builder::stream::close_document
+						<< bsoncxx::builder::stream::finalize;
+
+
+			bool success = client.update_documents(filter.view(), update.view());
+
+			if (success) {
+				std::cout << "Пароль успешно обновлен." << std::endl;
+			} else {
+				std::cerr << "Не удалось обновить пароль." << std::endl;
+			}
+			std::cout << "Пароли равны" << std::endl;
+
+
+		} else {
+
+			std::cout << "Пароли не равны" << std::endl;
+		}
+
+	});
+
+
+
+	svr.Get("/reset/:token", [&tokenGenerator, &emails_for_reset](const httplib::Request& req, httplib::Response& res) {
+		auto reset_token = req.path_params.at("token");
+		
+		if (tokenGenerator.isValidToken(reset_token)) {
+						
+			//emails_for_reset.insert("token");
+			std::string html_content = read_file("reset_password.html");
+            res.set_content(html_content, get_mime_type("reset_password.html"));
+			
+ 			httplib::Headers headers = {
+       			 {"token", reset_token}
+    		};
+						
+			res.set_header("token", reset_token);
+			res.status = 200;
+			
+
+			std::cout << "Токен действителен." << std::endl;
+        } else {
+            std::cout << "Токен недействителен." << std::endl;
+			res.status = 500;
+
+        }
+		std::cout << reset_token << std::endl;
+	
+	});
+
+
 	svr.Get("/styles.css", [](const httplib::Request& req, httplib::Response& res) {
        	try {
            		std::string css_content = read_file("styles.css");
@@ -178,33 +264,11 @@ int main() {
      	}
     });
 
-
-	svr.Get("/reset/:token", [&tokenGenerator](const httplib::Request& req, httplib::Response& res) {
-		auto reset_token = req.path_params.at("token");
-		
-		if (tokenGenerator.isValidToken(reset_token)) {
-			std::string html_content = read_file("reset_password.html");
-            res.set_content(html_content, get_mime_type("reset_password.html"));
-
-			std::string css_content = read_file("styles.css");
-           	res.set_content(css_content, get_mime_type("styles.css"));
-
-			res.status = 200;
-            
-			std::cout << "Токен действителен." << std::endl;
-        } else {
-            std::cout << "Токен недействителен." << std::endl;
-        }
-		std::cout << reset_token << std::endl;
-	
-
-	});
-
-
-
-	svr.Post("/reset_pass", [&env, &tokenGenerator](const httplib::Request& req, httplib::Response& res) {
+	svr.Post("/reset_pass", [&env, &tokenGenerator, &emails_for_reset](const httplib::Request& req, httplib::Response& res) {
 
 		std::string token_for_reset = tokenGenerator.generateToken();
+
+		
 		std::string url = + "http://localhost:8080/reset/"+token_for_reset;
 
 		//отправка email
@@ -213,6 +277,7 @@ int main() {
 		std::string username = env.get("EMAIL_FOR_SEND");
 		std::string password = env.get("PASSWORD_FOR_EMAIL");	
 		
+
 		EmailSender sender(from, to, username, password);
 
 		std::string subject = "Password reset from toguz korgool";
