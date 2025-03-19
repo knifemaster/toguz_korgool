@@ -15,10 +15,11 @@
 #include <load_env.hpp>
 #include <mongodbclient.hpp>
 #include <chrono>
-#include <sha256.hpp>
+
 #include <token_generator.hpp>
 #include <email_sender.hpp>
-
+#include <jwt_manager.hpp>
+#include <sha256.hpp>
 
 std::string read_file(const std::string filename) {
 	std::ifstream file(filename, std::ios::binary);
@@ -83,6 +84,11 @@ int main() {
 
 	DotEnv env;
 
+
+	JWTManager jwt_manager("your_secret_key");
+	std::set<std::string> active_refresh_tokens;
+
+
 	std::string dbUrl = env.get("DATABASE_URL");
 	std::string database_name = env.get("DATABASE");
 	std::string collection = env.get("COLLECTION");
@@ -122,7 +128,7 @@ int main() {
 				auto now = std::chrono::system_clock::now();
 				auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch());
 
-				SHA256 sha256;
+				utils::SHA256 sha256;
 				std::string cipher_password = sha256.hash(password);
 
 				bsoncxx::document::value doc_value = builder
@@ -144,11 +150,86 @@ int main() {
 	});
 
 
-	svr.Post("/login", [&client](const httplib::Request& req, httplib::Response& res) {
+    svr.Post("/refresh", [&active_refresh_tokens, &jwt_manager](const httplib::Request& req, httplib::Response& res) {
+        // Парсим JSON с refresh-токеном
+        picojson::value body;
+        std::string err = picojson::parse(body, req.body);
+        if (!err.empty()) {
+            res.status = 400; // Bad Request
+            res.set_content("Invalid JSON", "text/plain");
+            return;
+        }
+
+        std::string refresh_token = body.get("refresh_token").to_str();
+
+        // Проверяем, что refresh-токен активен
+        if (active_refresh_tokens.find(refresh_token) == active_refresh_tokens.end()) {
+            res.status = 401; // Unauthorized
+            res.set_content("Invalid refresh token", "text/plain");
+            return;
+        }
+
+        // Проверяем refresh-токен
+        std::string username;
+        if (!jwt_manager.verify_token(refresh_token, username)) {
+            res.status = 401; // Unauthorized
+            res.set_content("Invalid refresh token", "text/plain");
+            return;
+        }
+
+        // Удаляем использованный refresh-токен
+        active_refresh_tokens.erase(refresh_token);
+
+        // Создаём новый access-токен
+        std::string new_access_token = jwt_manager.create_token(username, std::chrono::minutes{15});
+
+        // Создаём новый refresh-токен
+        std::string new_refresh_token = jwt_manager.create_token(username, std::chrono::hours{24 * 7});
+        active_refresh_tokens.insert(new_refresh_token); // Сохраняем новый refresh-токен
+
+        // Возвращаем новые токены клиенту
+        picojson::object response;
+        response["access_token"] = picojson::value(new_access_token);
+        response["refresh_token"] = picojson::value(new_refresh_token);
+        res.set_content(picojson::value(response).serialize(), "application/json");
+    });
+
+
+
+	svr.Get("/test", [&](const httplib::Request& req, httplib::Response& res) {
+		 std::string auth_header = req.get_header_value("Authorization");
+
+		 std::cout <<"|auth header |"<< auth_header << std::endl;
+
+        // Проверяем, что заголовок начинается с "Bearer "
+        if (auth_header.find("Bearer ") == 0) {
+            std::string token = auth_header.substr(7); // Извлекаем токен
+            std::string username;
+
+            // Проверяем токен
+            if (jwt_manager.verify_token(token, username)) {
+                res.set_content("Hello, " + username + "! This is a protected resource.", "text/plain");
+            } else {
+                res.status = 401; // Unauthorized
+                res.set_content("Invalid token", "text/plain");
+            }
+        } else {
+            res.status = 401; // Unauthorized
+            res.set_content("Authorization header missing or invalid", "text/plain");
+        }
+
+	});
+
+
+
+
+	svr.Post("/login", [&client, &jwt_manager, &active_refresh_tokens](const httplib::Request& req, httplib::Response& res) {
+
 
 			std::string email = req.get_param_value("email");
 			std::string password = req.get_param_value("password");
 
+   
 			auto filter_email = bsoncxx::builder::stream::document{} << "email" << email << bsoncxx::builder::stream::finalize;
 
 			std::string cipher_password;
@@ -161,27 +242,55 @@ int main() {
 			} else {
 				std::cout << "email есть в базе" << std::endl;
 				std::cout << cipher_password << std::endl;
-				SHA256 sha256;
+				utils::SHA256 sha256;
 				
 				std::cout << "hash|"<< sha256.hash(password) << std::endl;
 				std::cout << "hash|"<< cipher_password << std::endl;
 
 				if (sha256.hash(password) == cipher_password) {
+					
 					std::cout << "password correct" << std::endl;
 					res.status = 200;
-				
+
+					std::string access_token = jwt_manager.create_token(email, std::chrono::minutes{15});
+
+					// Создаём refresh-токен (срок действия: 7 дней)
+					std::string refresh_token = jwt_manager.create_token(email, std::chrono::hours{24 * 7});
+					active_refresh_tokens.insert(refresh_token); // Сохраняем refresh-токен
+
+					// Возвращаем токены клиенту
+					picojson::object response;
+					response["access_token"] = picojson::value(access_token);
+					response["refresh_token"] = picojson::value(refresh_token);
+					res.set_content(picojson::value(response).serialize(), "application/json");
+
+				} else {
+					res.status = 401; // Unauthorized
+					res.set_content("Invalid username or password", "text/plain");
 				}
-				else {
-					std::cout << "password incorrect" << std::endl;
-					
-				}
+
 			}
+
 			
 	});
 
 
 	svr.Post("/save_password", [&client](const httplib::Request& req, httplib::Response& res) {
 		
+
+		std::string referer = req.get_header_value("Referer");
+
+        // Отправляем HTML с информацией о предыдущей странице
+        res.set_content(
+            "<html><body>"
+            "<h1>Second Page</h1>"
+            "<p>You came from: " + referer + "</p>"
+            "</body></html>",
+            "text/html"
+        );
+
+
+
 		auto email = req.get_param_value("email");
 		auto new_password = req.get_param_value("password");
 		auto confirm_password = req.get_param_value("confirm_password");
@@ -193,8 +302,8 @@ int main() {
 
 		if (new_password == confirm_password) {
 			
-			//SHA256 sha256;
-			//std::string cipher_password = sha256.hash(new_password);
+			utils::SHA256 sha256;
+			std::string cipher_password = sha256.hash(new_password);
 
 			auto filter = bsoncxx::builder::stream::document{}
 						<< "email" << email
@@ -202,7 +311,7 @@ int main() {
 
 			auto update = bsoncxx::builder::stream::document{}
 						<< "$set" << bsoncxx::builder::stream::open_document
-						<< "password" << new_password
+						<< "password" << cipher_password
 						<< bsoncxx::builder::stream::close_document
 						<< bsoncxx::builder::stream::finalize;
 
