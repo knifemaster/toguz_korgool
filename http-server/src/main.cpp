@@ -275,23 +275,29 @@ int main() {
 	});
 
 
-	svr.Post("/save_password", [&client](const httplib::Request& req, httplib::Response& res) {
+	svr.Post("/save_password", [&client, &emails_for_reset](const httplib::Request& req, httplib::Response& res) {
 		
 
 		std::string referer = req.get_header_value("Referer");
 
-        // Отправляем HTML с информацией о предыдущей странице
-        res.set_content(
-            "<html><body>"
-            "<h1>Second Page</h1>"
-            "<p>You came from: " + referer + "</p>"
-            "</body></html>",
-            "text/html"
-        );
+		std::string token_referer;// = referer.substr(7); 
+		size_t reset_pos = referer.find("/reset/");
+		if (reset_pos != std::string::npos) {
+			size_t token_start = reset_pos + 7; // 7 — длина "/reset/"
+			
+			token_referer = referer.substr(token_start);
+
+			std::cout << "Токен: " << token_referer << std::endl;
+		} else {
+			std::cout << "Токен не найден в строке." << std::endl;
+		}
 
 
+		std::string email = emails_for_reset[token_referer];
 
-		auto email = req.get_param_value("email");
+		emails_for_reset.erase(token_referer);
+
+		//auto email = req.get_param_value("email");
 		auto new_password = req.get_param_value("password");
 		auto confirm_password = req.get_param_value("confirm_password");
 
@@ -386,6 +392,7 @@ int main() {
 		std::string username = env.get("EMAIL_FOR_SEND");
 		std::string password = env.get("PASSWORD_FOR_EMAIL");	
 		
+		emails_for_reset[token_for_reset] = to;
 
 		EmailSender sender(from, to, username, password);
 
