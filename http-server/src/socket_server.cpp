@@ -67,6 +67,70 @@ int main() {
 
     std::cout << "Сервер запущен на порту " << PORT << std::endl;
 
+    while (true) {
+        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+        for (int i = 0; i < n; ++i) {
+            if (events[i].data.fd == server_fd) {
+                while (true) {
+                    int client_fd = accept(server_fd, nullptr, nullptr);
+                    if (client_fd == -1) {
+                        break;
+                    }
+                    set_nonblocking(client_fd);
+
+                    epoll_event client_event{};
+                    client_event.data.fd = client_fd;
+                    client_event.events = EPOLLIN | EPOLLET; // Edge-triggered
+                    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &client_event);
+
+                    std::cout << "Новый клиент: fd=" << client_fd << std::endl;
+                }
+            } else {
+                int client_fd = events[i].data.fd;
+                while (true) {
+                    char buffer[BUFFER_SIZE];
+                    int bytes_read = read(client_fd, buffer, sizeof(buffer) - 1);
+                    if (bytes_read <= 0) {
+                        if (errno != EAGAIN && errno != EWOULDBLOCK) {
+                            std::cout << "Отключен клиент: fd=" << client_fd << std::endl;
+                            close(client_fd);
+                            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
+                        }
+                        break;
+                    }
+
+                    buffer[bytes_read] = '\0';
+                    std::string input(buffer);
+                    input.erase(input.find_last_not_of(" \n\r\t") + 1); // trim
+
+                    std::cout << "[" << client_fd << "] " << input << std::endl;
+
+                    std::string response;
+
+                    if (input == "PING") {
+                        response = "PONG\n";
+                    } else if (input == "TIME") {
+                        time_t now = time(nullptr);
+                        response = std::string("TIME: ") + ctime(&now);
+                    } else if (input == "EXIT") {
+                        response = "Goodbye!\n";
+                        send(client_fd, response.c_str(), response.length(), 0);
+                        close(client_fd);
+                        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, nullptr);
+                        std::cout << "Клиент вышел: fd=" << client_fd << std::endl;
+                        break;
+                    } else {
+                        response = "Echo: " + input + "\n";
+                    }
+
+                    send(client_fd, response.c_str(), response.length(), 0);
+                }
+            }
+        }
+    }
+
+    close(server_fd);
+
 
     return 0;
 }
