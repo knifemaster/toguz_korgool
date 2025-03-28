@@ -25,3 +25,14 @@ void set_nonblocking(int sockfd) {
         exit(1);
     }
 }
+
+int main() {
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        perror("socket failed");
+        return 1;
+
+
+
+    return 0;
+}
