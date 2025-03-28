@@ -20,6 +20,6 @@ int main() {
 
     listen(server_socket, 5);
 
-
+    int client_socket = accept(server_socket, nullptr, nullptr);
 
 }
