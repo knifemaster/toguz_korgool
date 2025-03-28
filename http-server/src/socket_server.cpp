@@ -59,5 +59,14 @@ int main() {
         return 1;
     }
 
+
+    epoll_event event{}, events[MAX_EVENTS];
+    event.data.fd = server_fd;
+    event.events = EPOLLIN;
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &event);
+
+    std::cout << "Сервер запущен на порту " << PORT << std::endl;
+
+
     return 0;
 }
