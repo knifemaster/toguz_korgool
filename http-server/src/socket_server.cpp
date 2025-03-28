@@ -27,4 +27,6 @@ int main() {
 
     cout << "Message from client : " << buffer << "\n";
 
+    close(server_socket);
+
 }
