@@ -16,6 +16,6 @@ int main() {
     server_address.sin_port = htons(8080);
     server_address.sin_addr.s_addr = INADDR_ANY;
 
-
+    bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address));
 
 }
