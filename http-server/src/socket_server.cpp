@@ -7,3 +7,21 @@
 #include <sys/epoll.h>
 #include <ctime>
 #include <string>
+
+
+constexpr int PORT = 8080;
+constexpr int MAX_EVENTS = 10;
+constexpr int BUFFER_SIZE = 1024;
+
+// Установка сокета в неблокирующий режим
+void set_nonblocking(int sockfd) {
+    int flags = fcntl(sockfd, F_GETFL, 0);
+    if (flags == -1) {
+        perror("fcntl get");
+        exit(1);
+    }
+    if (fcntl(sockfd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl set");
+        exit(1);
+    }
+}
