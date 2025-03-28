@@ -46,6 +46,11 @@ int main() {
         return 1;
     }
 
+    if (listen(server_fd, SOMAXCONN) < 0) {
+        perror("listen failed");
+        return 1;
+    }
+
 
     return 0;
 }
