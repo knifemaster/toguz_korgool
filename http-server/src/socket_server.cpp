@@ -51,6 +51,13 @@ int main() {
         return 1;
     }
 
+    set_nonblocking(server_fd);
+
+    int epoll_fd = epoll_create1(0);
+    if (epoll_fd == -1) {
+        perror("epoll_create1 failed");
+        return 1;
+    }
 
     return 0;
 }
