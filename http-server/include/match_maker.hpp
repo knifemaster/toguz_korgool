@@ -88,3 +88,9 @@ class ThreadSafeMatchmaker {
             });
         }
     }
+
+    void shutdown() {
+        shutdown_flag = true;
+        cv.notify_all();
+    }
+
