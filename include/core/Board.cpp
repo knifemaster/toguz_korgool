@@ -3,21 +3,14 @@
 #include <array>
 #include <utility>
 #include <optional>
-
-enum class CellType {
-	TOGUZ_KORGOOL,
-	Type2,
-	Type3,
-	Type4,
-
-};
+#include <memory>
 
 
 class Board {
 
 	public:
-		Board(size_t size, int ball_count) {
-
+		Board(int id) : game_id(id) {
+            
 		
 		}
 
@@ -137,20 +130,51 @@ class Board {
 		}
 
 	private:
-		//std::vector<unsigned short> or byte
 		int cell_count = 9;
 		std::vector<int> player1 {9, 9, 9, 9, 9, 20, 9, 9, 9};
 		std::vector<int> player2 {9, 9, 9, 9, 9, 9, 9, 9, 9};	
-		//std::vector<bool> ace1 {false, false, false, false, false, false, false, false, false};
-		//std::vector<bool> ace2 {false, false, false, false, false, false, false, false, false};
-		
-		std::vector<std::optional<bool>> ace1 {std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt};
-		//std::vector<bool> ace_position {false, false, false, false, false, false, false, false, false};
-		//std::vector<bool> ace_position2 {false, false, false, false, false, false, false, false, false};
 		
 		std::vector<std::optional<bool>> ace;	
 
 };
+
+class Game {
+    public:
+        Game(int game_id, int game_status) : game_id(game_id), game_status(game_status) {}
+
+        int get_game_id() const {
+            return game_id;
+        }
+
+        int get_game_status() const {
+            return game_status;
+        }
+
+        void move(int position, bool color ) {
+            board.move(postion, color);
+        }
+
+    private:
+        int game_id;
+        int game_status; // пока инт
+        Board board;
+
+};
+
+
+class World {
+    public:
+        void World() {};
+
+        void add_game_to(int game_id) {
+            games.insert(game_id, Game{});
+        }
+
+        
+
+    private: 
+        std::unordered_map<int, Game> games;
+}
 
 
 int main() {
