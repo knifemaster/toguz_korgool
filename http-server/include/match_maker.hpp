@@ -93,4 +93,13 @@ class ThreadSafeMatchmaker {
         shutdown_flag = true;
         cv.notify_all();
     }
+    
+
+    void printStats() const {
+        std::cout << "Статистика:\n"
+                  << "Всего игроков: " << total_players << "\n"
+                  << "Найдено пар: " << total_matches << "\n"
+                  << "В очереди: " << players.size() << std::endl;
+        }
+    };
 
