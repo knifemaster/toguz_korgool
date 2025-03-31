@@ -9,3 +9,11 @@
 #include <atomic>
 #include <condition_variable>
 
+
+
+struct Player {
+    int id;
+    int rating;
+    std::chrono::time_point<std::chrono::system_clock> joinTime;
+};
+
