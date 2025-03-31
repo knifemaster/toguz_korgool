@@ -17,9 +17,15 @@ struct Player {
     std::chrono::time_point<std::chrono::system_clock> joinTime;
 };
 
+struct PlayerComparator {
+    bool operator()(const Player& a, const Player& b) const {
+        return a.rating < b.rating ||
+              (a.rating == b.rating && a.joinTime < b.joinTime);
+    }
+};
 
 class ThreadSafeMatchmaker {
-    std::set<Player, bool(*)(const Player&, const Player&)> players;
+    std::set<Player, PlayerComparator> players;
     std::mutex mtx;
     std::condition_variable cv;
     std::atomic<bool> shutdown_flag{false};
