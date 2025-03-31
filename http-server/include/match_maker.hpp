@@ -34,3 +34,10 @@ class ThreadSafeMatchmaker {
             return a.rating < b.rating || (a.rating == b.rating && a.joinTime < b.joinTime);
         }) {}
 
+
+    void addPlayer(const Player& p) {
+        std::lock_guard<std::mutex> lock(mtx);
+        players.insert(p);
+        total_players++;
+        cv.notify_one();  // Оповещаем поток матчинга
+    }
