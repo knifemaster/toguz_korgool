@@ -41,3 +41,33 @@ class ThreadSafeMatchmaker {
         total_players++;
         cv.notify_one();  // Оповещаем поток матчинга
     }
+
+
+    bool tryFindMatch(std::pair<Player, Player>& match) {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (players.size() < 2) return false;
+
+        auto now = std::chrono::system_clock::now();
+
+        for (auto it1 = players.begin(); it1 != players.end(); ++it1) {
+            auto waitTime = std::chrono::duration_cast<std::chrono::seconds>(now - it1->joinTime);
+            int dynamicMaxDiff = 100 + waitTime.count() * 10;
+
+            Player lowerBound{0, it1->rating - dynamicMaxDiff, {}};
+            Player upperBound{0, it1->rating + dynamicMaxDiff, {}};
+
+            auto lower = players.lower_bound(lowerBound);
+            auto upper = players.upper_bound(upperBound);
+
+            for (auto it2 = lower; it2 != upper; ++it2) {
+                if (it2 != it1) {
+                    match = {*it1, *it2};
+                    players.erase(it1);
+                    players.erase(it2);
+                    total_matches++;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
