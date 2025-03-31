@@ -27,3 +27,10 @@ class ThreadSafeMatchmaker {
     // Статистика
     std::atomic<int> total_matches{0};
     std::atomic<int> total_players{0};
+
+    public:
+    ThreadSafeMatchmaker()
+        : players([](const Player& a, const Player& b) {
+            return a.rating < b.rating || (a.rating == b.rating && a.joinTime < b.joinTime);
+        }) {}
+
