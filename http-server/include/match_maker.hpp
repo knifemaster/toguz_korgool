@@ -71,3 +71,20 @@ class ThreadSafeMatchmaker {
         }
         return false;
     }
+
+   void matchingThread() {
+        while (!shutdown_flag) {
+            std::pair<Player, Player> match;
+            if (tryFindMatch(match)) {
+                // нашли игроков
+                //
+                // В реальном приложении здесь была бы логика старта игры
+                continue;
+            }
+
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait_for(lock, std::chrono::seconds(1), [this]() {
+                return shutdown_flag || players.size() >= 2;
+            });
+        }
+    }
