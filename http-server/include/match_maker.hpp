@@ -17,3 +17,13 @@ struct Player {
     std::chrono::time_point<std::chrono::system_clock> joinTime;
 };
 
+
+class ThreadSafeMatchmaker {
+    std::set<Player, bool(*)(const Player&, const Player&)> players;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::atomic<bool> shutdown_flag{false};
+
+    // Статистика
+    std::atomic<int> total_matches{0};
+    std::atomic<int> total_players{0};
