@@ -16,3 +16,15 @@ public:
         player1[5] = 20;
     }
 
+
+    const std::vector<int>& get_player1_board() const { return player1; }
+    const std::vector<int>& get_player2_board() const { return player2; }
+
+    void print_boards() const {
+        std::cout << "Player 1: ";
+        for (const auto& cell : player1) std::cout << cell << " ";
+        std::cout << "\nPlayer 2: ";
+        for (const auto& cell : player2) std::cout << cell << " ";
+        std::cout << "\n";
+    }
+
