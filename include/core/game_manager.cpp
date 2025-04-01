@@ -125,3 +125,37 @@ void player_thread(GameManager& manager, int game_id, int moves) {
         std::cerr << "Thread error: " << e.what() << "\n";
     }
 }
+
+
+int main() {
+    GameManager manager;
+
+    // Создаем несколько игр
+    for (int i = 1; i <= 5; ++i) {
+        manager.create_game(i);
+    }
+
+    // Запускаем потоки игроков
+    std::vector<std::thread> threads;
+    for (int i = 0; i < 3; ++i) {
+        threads.emplace_back(player_thread, std::ref(manager), i % 3 + 1, 5);
+    }
+
+    // Главный поток также может работать с играми
+    for (int i = 0; i < 3; ++i) {
+        manager.make_move(4, i, false);
+        manager.print_all_games();
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
+
+    // Ждем завершения всех потоков
+    for (auto& t : threads) {
+        t.join();
+    }
+
+    // Финальное состояние
+    std::cout << "Final state:\n";
+    manager.print_all_games();
+
+    return 0;
+}
