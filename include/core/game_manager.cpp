@@ -86,3 +86,29 @@ public:
         games_.emplace(game_id, std::make_unique<Game>(game_id, GameStatus::ACTIVE));
     }
 
+    Game* get_game(int game_id) {
+        std::shared_lock<std::shared_mutex> lock(games_mutex_);
+        auto it = games_.find(game_id);
+        if (it == games_.end()) {
+            throw std::runtime_error("Game not found");
+        }
+        return it->second.get();
+    }
+
+    void make_move(int game_id, int position, bool color) {
+        Game* game = get_game(game_id);
+        game->move(position, color);
+    }
+
+    void print_all_games() const {
+        std::shared_lock<std::shared_mutex> lock(games_mutex_);
+        for (const auto& [id, game] : games_) {
+            std::cout << "Game ID: " << id << "\n";
+            game->get_board()->print_boards();
+        }
+    }
+
+private:
+    mutable std::shared_mutex games_mutex_;
+    std::unordered_map<int, std::unique_ptr<Game>> games_;
+};
