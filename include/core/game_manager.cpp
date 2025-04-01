@@ -75,3 +75,14 @@ private:
     std::unique_ptr<Board> board;
 };
 
+
+class GameManager {
+public:
+    void create_game(int game_id) {
+        std::unique_lock<std::shared_mutex> lock(games_mutex_);
+        if (games_.find(game_id) != games_.end()) {
+            throw std::runtime_error("Game with this ID already exists");
+        }
+        games_.emplace(game_id, std::make_unique<Game>(game_id, GameStatus::ACTIVE));
+    }
+
