@@ -45,3 +45,9 @@ public:
         }
     }
 
+private:
+    int id;
+    std::vector<int> player1;
+    std::vector<int> player2;
+    mutable std::mutex board_mutex;
+};
