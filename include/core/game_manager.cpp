@@ -51,3 +51,27 @@ private:
     std::vector<int> player2;
     mutable std::mutex board_mutex;
 };
+
+
+num class GameStatus { ACTIVE, FINISHED };
+
+class Game {
+public:
+    Game(int game_id, GameStatus status)
+        : id(game_id), status(status), board(std::make_unique<Board>(game_id)) {}
+
+    int get_id() const { return id; }
+    GameStatus get_status() const { return status; }
+    Board* get_board() { return board.get(); }
+    const Board* get_board() const { return board.get(); }
+
+    void move(int position, bool color) {
+        board->move(position, color);
+    }
+
+private:
+    int id;
+    GameStatus status;
+    std::unique_ptr<Board> board;
+};
+
