@@ -28,3 +28,20 @@ public:
         std::cout << "\n";
     }
 
+
+    void move(int position, bool color) {
+        std::lock_guard<std::mutex> lock(board_mutex);
+        if (color) { // white
+            if (position < 0 || position >= static_cast<int>(player1.size())) return;
+            
+            int count = player1[player1.size() - 1 - position];
+            player1[player1.size() - 1 - position] = 0;
+            
+            for (int i = player1.size() - 1 - position; i >= 0; --i) {
+                player1[i]++;
+            }
+        } else {
+            // TODO: Implement black player move
+        }
+    }
+
