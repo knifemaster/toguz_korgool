@@ -112,3 +112,16 @@ private:
     mutable std::shared_mutex games_mutex_;
     std::unordered_map<int, std::unique_ptr<Game>> games_;
 };
+
+
+
+void player_thread(GameManager& manager, int game_id, int moves) {
+    try {
+        for (int i = 0; i < moves; ++i) {
+            manager.make_move(game_id, i % 9, true); // Чередуем позиции
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Thread error: " << e.what() << "\n";
+    }
+}
