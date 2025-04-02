@@ -107,3 +107,53 @@ std::string process_command(const std::string& cmd) {
         return "Unknown command. Available commands: HELLO, TIME, STATS, ECHO, QUIT\n";
     }
 }
+
+
+// передаем  через параметры
+// состояния игр id_игры
+//
+void process_client_data(int fd) {
+    std::lock_guard<std::mutex> lock(connections_mutex);
+    if (connections.find(fd) == connections.end()) return;
+
+    auto& conn = connections[fd];
+    conn.last_activity = time(nullptr);
+
+    size_t pos;
+    while ((pos = conn.buffer.find('\n')) != std::string::npos) {
+        std::string cmd = conn.buffer.substr(0, pos);
+        conn.buffer.erase(0, pos + 1);
+
+        cmd.erase(std::remove(cmd.begin(), cmd.end(), '\r'), cmd.end());
+
+        if (!cmd.empty()) {
+            std::cout << "Processing command from fd " << fd << ": " << cmd << std::endl;
+
+            // логика игры здесь
+            // запускаем игры
+            std::string response = process_command(cmd);
+            // генерируем ответ
+            ssize_t sent = send(fd, response.c_str(), response.size(), 0);
+            if (sent == -1) {
+                perror("send");
+                close(fd);
+                connections.erase(fd);
+                return;
+            }
+
+            if (cmd.find("quit") == 0) {
+                close(fd);
+                connections.erase(fd);
+                return;
+            }
+        }
+    }
+
+    if (conn.buffer.size() > MAX_BUFFER_SIZE) {
+        std::cerr << "Buffer overflow for fd " << fd << ", closing connection" << std::endl;
+        send(fd, "ERROR: Buffer overflow, connection closed\n", 41, 0);
+        close(fd);
+        connections.erase(fd);
+    }
+}
+
