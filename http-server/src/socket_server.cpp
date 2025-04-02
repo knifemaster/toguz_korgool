@@ -73,3 +73,37 @@ int create_listen_socket(int port) {
 
     return listen_fd;
 }
+
+
+std::string process_command(const std::string& cmd) {
+    std::stringstream ss(cmd);
+    std::string command;
+    ss >> command;
+    std::transform(command.begin(), command.end(), command.begin(), ::tolower);
+
+    if (command == "hello") {
+        return "Hello! How can I help you?\n";
+    }
+    else if (command == "time") {
+        time_t now = time(nullptr);
+        return std::string("Server time: ") + ctime(&now);
+    }
+    else if (command == "stats") {
+        std::lock_guard<std::mutex> lock(connections_mutex);
+        return "Active connections: " + std::to_string(connections.size()) + "\n";
+    }
+    else if (command == "echo") {
+        std::string rest;
+        std::getline(ss, rest);
+        if (!rest.empty() && rest[0] == ' ') {
+            rest.erase(0, 1);
+        }
+        return "ECHO: " + rest + "\n";
+    }
+    else if (command == "quit") {
+        return "Goodbye!\n";
+    }
+    else {
+        return "Unknown command. Available commands: HELLO, TIME, STATS, ECHO, QUIT\n";
+    }
+}
