@@ -205,3 +205,23 @@ void worker_thread(int epoll_fd) {
         }
     }
 }
+
+
+void check_timeouts() {
+    while (!stop_flag) {
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+        time_t now = time(nullptr);
+        std::lock_guard<std::mutex> lock(connections_mutex);
+
+        for (auto it = connections.begin(); it != connections.end(); ) {
+            if (now - it->second.last_activity > 60) {
+                std::cout << "Connection timeout for fd " << it->first << std::endl;
+                close(it->first);
+                it = connections.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+}
+
