@@ -37,3 +37,39 @@ void set_nonblocking(int fd) {
         perror("fcntl");
     }
 }
+
+
+int create_listen_socket(int port) {
+    int listen_fd = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (listen_fd == -1) {
+        perror("socket");
+        return -1;
+    }
+
+    int opt = 1;
+    if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))) {
+        perror("setsockopt");
+        close(listen_fd);
+        return -1;
+    }
+
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(port);
+
+    if (bind(listen_fd, (sockaddr*)&addr, sizeof(addr))) {
+        perror("bind");
+        close(listen_fd);
+        return -1;
+    }
+
+    if (listen(listen_fd, SOMAXCONN)) {
+        perror("listen");
+        close(listen_fd);
+        return -1;
+    }
+
+    return listen_fd;
+}
