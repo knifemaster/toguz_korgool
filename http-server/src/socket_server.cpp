@@ -157,3 +157,51 @@ void process_client_data(int fd) {
     }
 }
 
+
+void worker_thread(int epoll_fd) {
+    epoll_event events[MAX_EVENTS];
+
+    while (!stop_flag) {
+        int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, 100);
+        if (num_events == -1) {
+            if (errno == EINTR) continue;
+            perror("epoll_wait");
+            break;
+        }
+
+        for (int i = 0; i < num_events; ++i) {
+            int fd = events[i].data.fd;
+
+            if (events[i].events & (EPOLLIN | EPOLLERR | EPOLLHUP)) {
+                if (connections.find(fd) != connections.end()) {
+                    char buf[MAX_CMD_LENGTH];
+                    while (true) {
+                        ssize_t count = read(fd, buf, sizeof(buf));
+                        if (count == -1) {
+                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                process_client_data(fd);
+                                break;
+                            } else {
+                                perror("read");
+                                std::lock_guard<std::mutex> lock(connections_mutex);
+                                close(fd);
+                                connections.erase(fd);
+                                break;
+                            }
+                        } else if (count == 0) {
+                            std::lock_guard<std::mutex> lock(connections_mutex);
+                            close(fd);
+                            connections.erase(fd);
+                            break;
+                        } else {
+                            {
+                                std::lock_guard<std::mutex> lock(connections_mutex);
+                                connections[fd].buffer.append(buf, count);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
