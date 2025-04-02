@@ -225,3 +225,111 @@ void check_timeouts() {
     }
 }
 
+
+int main() {
+    std::vector<int> listen_sockets;
+    for (int port = 8080; port < 8085; ++port) {
+        int sock = create_listen_socket(port);
+        if (sock != -1) {
+            listen_sockets.push_back(sock);
+            std::cout << "Listening on port " << port << std::endl;
+        }
+    }
+
+    if (listen_sockets.empty()) {
+        std::cerr << "No listening sockets created" << std::endl;
+        return 1;
+    }
+
+    int epoll_fd = epoll_create1(0);
+    if (epoll_fd == -1) {
+        perror("epoll_create1");
+        return 1;
+    }
+
+    for (int sock : listen_sockets) {
+        epoll_event event;
+        event.events = EPOLLIN;
+        event.data.fd = sock;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock, &event)) {
+            perror("epoll_ctl");
+            close(sock);
+        }
+    }
+
+    std::vector<std::thread> workers;
+    for (int i = 0; i < NUM_WORKERS; ++i) {
+        workers.emplace_back(worker_thread, epoll_fd);
+    }
+
+    std::thread timeout_thread(check_timeouts);
+
+    while (!stop_flag) {
+        epoll_event events[MAX_EVENTS];
+        int num_events = epoll_wait(epoll_fd, events, MAX_EVENTS, 100);
+        if (num_events == -1) {
+            if (errno == EINTR) continue;
+            perror("epoll_wait");
+            break;
+        }
+
+        for (int i = 0; i < num_events; ++i) {
+            int fd = events[i].data.fd;
+
+            if (std::find(listen_sockets.begin(), listen_sockets.end(), fd) != listen_sockets.end()) {
+                sockaddr_in client_addr;
+                socklen_t client_len = sizeof(client_addr);
+                int client_fd = accept(fd, (sockaddr*)&client_addr, &client_len);
+                if (client_fd == -1) {
+                    perror("accept");
+                    continue;
+                }
+
+                set_nonblocking(client_fd);
+
+                epoll_event event;
+                event.events = EPOLLIN | EPOLLET;
+                event.data.fd = client_fd;
+                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, client_fd, &event)) {
+                    perror("epoll_ctl");
+                    close(client_fd);
+                    continue;
+                }
+
+                std::lock_guard<std::mutex> lock(connections_mutex);
+                connections[client_fd] = {client_fd, "", time(nullptr)};
+
+                std::string welcome = "Welcome to the server! Available commands:\n"
+                                    "HELLO - Greeting\n"
+                                    "TIME - Server time\n"
+                                    "STATS - Connection statistics\n"
+                                    "ECHO <text> - Echo text\n"
+                                    "QUIT - Disconnect\n";
+                send(client_fd, welcome.c_str(), welcome.size(), 0);
+            }
+        }
+    }
+
+    stop_flag = true;
+    for (auto& worker : workers) {
+        if (worker.joinable()) {
+            worker.join();
+        }
+    }
+    timeout_thread.join();
+
+    std::lock_guard<std::mutex> lock(connections_mutex);
+    for (const auto& conn : connections) {
+        close(conn.first);
+    }
+    connections.clear();
+
+    for (int sock : listen_sockets) {
+        close(sock);
+    }
+
+    close(epoll_fd);
+
+    return 0;
+}
+
