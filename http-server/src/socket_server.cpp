@@ -26,3 +26,14 @@ struct Connection {
     std::string buffer;
     time_t last_activity;
 };
+
+
+std::mutex connections_mutex;
+std::unordered_map<int, Connection> connections;
+
+void set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+        perror("fcntl");
+    }
+}
