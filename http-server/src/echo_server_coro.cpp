@@ -107,3 +107,20 @@ std::expected<void, std::string> write_line(int fd, const std::string& data) {
     return {};
 }
 
+std::coroutine_handle<> handle_client(int client_fd) {
+  struct local_promise_type {
+    std::coroutine_handle<> get_return_object() {
+      return std::coroutine_handle<local_promise_type>::from_promise(*this);
+    }
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_void() {}
+    void unhandled_exception() { std::terminate(); }
+    io_operation await_transform(io_operation op) { return op; }
+  };
+
+  local_promise_type promise;
+  return std::coroutine_handle<local_promise_type>::from_address(
+      std::coroutine_handle<local_promise_type>::from_promise(promise).address());
+}
+
