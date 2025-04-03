@@ -55,3 +55,11 @@ struct Task {
     };
 };
 
+io_operation async_read(int fd) {
+    return {fd, EPOLLIN};
+}
+
+io_operation async_write(int fd) {
+    return {fd, EPOLLOUT};
+}
+
