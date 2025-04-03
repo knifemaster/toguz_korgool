@@ -63,3 +63,28 @@ io_operation async_write(int fd) {
     return {fd, EPOLLOUT};
 }
 
+std::expected<std::string, std::string> read_line(int fd) {
+    char buf[1024];
+    std::string buffer;
+
+    while (true) {
+        async_read(fd);
+
+        ssize_t n = recv(fd, buf, sizeof(buf), 0);
+        if (n <= 0) {
+            if (n == 0) {
+              return std::unexpected("Client disconnected");
+            } else {
+              return std::unexpected(std::string(strerror(errno)));
+            }
+        }
+
+        buffer.append(buf, n);
+        if (buffer.find('\n') != std::string::npos) {
+            buffer.erase(buffer.find_last_not_of("\n\r") + 1);
+            break;
+        }
+    }
+    return buffer;
+}
+
