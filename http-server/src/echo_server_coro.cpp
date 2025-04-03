@@ -88,3 +88,22 @@ std::expected<std::string, std::string> read_line(int fd) {
     return buffer;
 }
 
+
+std::expected<void, std::string> write_line(int fd, const std::string& data) {
+    std::string message = data + "\n";
+    const char* ptr = message.data();
+    size_t remaining = message.size();
+
+    while (remaining > 0) {
+        async_write(fd);
+
+        ssize_t n = send(fd, ptr, remaining, 0);
+        if (n <= 0) {
+            return std::unexpected(std::string(strerror(errno)));
+        }
+        ptr += n;
+        remaining -= n;
+    }
+    return {};
+}
+
