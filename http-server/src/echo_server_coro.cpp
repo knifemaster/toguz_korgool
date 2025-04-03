@@ -41,3 +41,17 @@ struct io_operation {
         }
     }
 };
+
+struct Task {
+    struct promise_type {
+        Task get_return_object() { return Task{}; }
+        std::suspend_never initial_suspend() { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
+        void return_void() {}
+        void unhandled_exception() { std::terminate(); }
+
+        // Разрешаем co_await только для io_operation
+        io_operation await_transform(io_operation op) { return op; }
+    };
+};
+
