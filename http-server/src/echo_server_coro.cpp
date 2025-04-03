@@ -1,12 +1,43 @@
 #include <iostream>
 #include <string>
-#include <cstring>
-#include <unistd.h>
+#include <chrono>
+#include <ctime>
+#include <vector>
+#include <sys/epoll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <sys/epoll.h>
-#include <vector>
-#include <map>
-#include <thread>
-#include <sstream>
+#include <unistd.h>
+#include <fcntl.h>
+#include <cerrno>
+#include <cstring>
+#include <coroutine>
+#include <queue>
+#include <unordered_map>
+#include <stdexcept>
+#include <expected>
+
+static int epoll_fd = -1;
+
+// Awaitable объект для операций ввода-вывода
+struct io_operation {
+    int fd;
+    uint32_t events;
+    
+    bool await_ready() const noexcept { return false; }
+    
+    void await_suspend(std::coroutine_handle<> h) const {
+        epoll_event ev{};
+        ev.events = events;
+        ev.data.ptr = h.address();
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev) < 0) {
+          throw std::runtime_error("epoll_ctl failed");
+        }
+    }
+    
+    void await_resume() const {
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, nullptr) < 0) {
+          throw std::runtime_error("epoll_ctl delete failed");
+        }
+    }
+};
