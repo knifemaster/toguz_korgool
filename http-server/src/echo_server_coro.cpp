@@ -109,3 +109,57 @@ Task client_coroutine(int epoll_fd, int client_fd) {
     co_return;
 }
 
+
+int main() {
+    int server_fd, epoll_fd;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    set_nonblocking(server_fd);
+
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    bind(server_fd, (struct sockaddr *)&address, sizeof(address));
+    listen(server_fd, 10);
+
+    epoll_fd = epoll_create1(0);
+
+    // Регистрируем серверный сокет
+    epoll_event ev{};
+    ev.events = EPOLLIN;
+    ev.data.fd = server_fd;
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, server_fd, &ev);
+
+    std::cout << "Coroutine server listening on port " << PORT << "...\n";
+
+    epoll_event events[MAX_EVENTS];
+
+    while (true) {
+        int n = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+
+        for (int i = 0; i < n; ++i) {
+            if (events[i].data.fd == server_fd) {
+                // Новое подключение
+                int client_fd = accept(server_fd, nullptr, nullptr);
+                if (client_fd >= 0) {
+                    set_nonblocking(client_fd);
+                    client_coroutine(epoll_fd, client_fd);
+                }
+            } else {
+                // Событие клиента
+                auto* awaiter = static_cast<EpollAwaiter*>(events[i].data.ptr);
+                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, awaiter->fd, nullptr);
+                awaiter->handle.resume();
+            }
+        }
+    }
+
+    close(server_fd);
+    close(epoll_fd);
+    return 0;
+}
