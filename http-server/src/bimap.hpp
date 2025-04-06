@@ -21,3 +21,8 @@ public:
 
         return left_to_right.at(l);
     }
+
+    Left at_right(const Right& r) const {
+        return right_to_left.at(r);
+    }
+};
