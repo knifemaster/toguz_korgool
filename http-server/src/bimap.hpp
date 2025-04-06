@@ -16,3 +16,8 @@ public:
         left_to_right[l] = r;
         right_to_left[r] = l;
     }
+
+    Right at_left(const Left& l) const {
+
+        return left_to_right.at(l);
+    }
