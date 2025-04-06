@@ -26,3 +26,13 @@ public:
         return right_to_left.at(r);
     }
 };
+
+
+int main() {
+    Bimap<int, int> socket_descriptors;
+    socket_descriptors.insert(43123, 3213);
+    socket_descriptors.insert(4324, 43241);
+
+    std::cout << socket_descriptors.at_left(4324) << '\n';  // 1
+    std::cout << socket_descriptors.at_right(3213) << '\n';     // "two"
+}
