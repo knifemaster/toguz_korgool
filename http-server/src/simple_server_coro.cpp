@@ -36,3 +36,23 @@ void set_nonblocking(int fd) {
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }
 
+
+// Awaitable для событий epoll
+struct EpollAwaiter {
+    int epoll_fd;
+    int fd;
+    uint32_t events;
+    std::coroutine_handle<> handle;
+
+    bool await_ready() const noexcept { return false; }
+
+    void await_suspend(std::coroutine_handle<> h) {
+        handle = h;
+        epoll_event ev{};
+        ev.events = events;
+        ev.data.ptr = this;
+        epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev);
+    }
+
+    void await_resume() const noexcept {}
+};
