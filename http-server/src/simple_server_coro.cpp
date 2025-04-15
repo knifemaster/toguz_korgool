@@ -40,3 +40,25 @@ void set_nonblocking(int fd) {
     }
 }
 
+
+class SocketGuard {
+    int fd_ = -1;
+public:
+    explicit SocketGuard(int fd = -1) : fd_(fd) {}
+    ~SocketGuard() { if (fd_ != -1) close(fd_); }
+
+    SocketGuard(SocketGuard&& other) noexcept : fd_(other.fd_) { other.fd_ = -1; }
+    SocketGuard& operator=(SocketGuard&& other) noexcept {
+        if (this != &other) {
+            if (fd_ != -1) close(fd_);
+            fd_ = other.fd_;
+            other.fd_ = -1;
+        }
+        return *this;
+    }
+
+    operator int() const { return fd_; }
+    int release() { int fd = fd_; fd_ = -1; return fd; }
+};
+
+
