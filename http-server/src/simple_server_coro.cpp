@@ -257,3 +257,16 @@ void init_socket_server() {
     if (bind(server_guard, (sockaddr*)&address, sizeof(address)) == -1) throw std::runtime_error("bind failed");
     if (listen(server_guard, SOMAXCONN) == -1) throw std::runtime_error("listen failed");
 
+
+    SocketGuard epoll_guard(epoll_create1(0));
+    if (epoll_guard == -1) throw std::runtime_error("epoll_create1 failed");
+
+    epoll_event ev{};
+    ev.events = EPOLLIN | EPOLLET;
+    ev.data.fd = server_guard;
+    epoll_ctl(epoll_guard, EPOLL_CTL_ADD, server_guard, &ev);
+
+    epoll_event events[MAX_EVENTS];
+    std::cout << "Server listening on port " << PORT << std::endl;
+
+
