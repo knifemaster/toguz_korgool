@@ -269,4 +269,41 @@ void init_socket_server() {
     epoll_event events[MAX_EVENTS];
     std::cout << "Server listening on port " << PORT << std::endl;
 
+    while (true) {
+        int n = epoll_wait(epoll_guard, events, MAX_EVENTS, -1);
+        if (n == -1) {
+            if (errno == EINTR) continue;
+            throw std::runtime_error("epoll_wait failed");
+        }
+
+        for (int i = 0; i < n; ++i) {
+            if (events[i].data.fd == server_guard) {
+                while (true) {
+                    int client_fd = accept(server_guard, nullptr, nullptr);
+                    if (client_fd == -1) {
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                        throw std::runtime_error("accept failed");
+                    }
+
+                    try {
+                        set_nonblocking(client_fd);
+                        pool.enqueue([&manager, &matchmaker, &socket_descriptors, &epoll_guard, client_fd]() {
+                        client_coroutine(epoll_guard, client_fd, manager, socket_descriptors, matchmaker).start();
+                        });
+                        //pool.enqueue([=, &manager, &matchmaker, &socket_descriptors]() {
+                        //    client_coroutine(epoll_guard, client_fd, manager, socket_descriptors, matchmaker).start();
+                        //});
+                    } catch (...) {
+                        close(client_fd);
+                        throw;
+                    }
+                }
+            } else {
+                auto* awaiter = static_cast<EpollAwaiter*>(events[i].data.ptr);
+                awaiter->handle.resume();
+            }
+        }
+    }
+}
+
 
