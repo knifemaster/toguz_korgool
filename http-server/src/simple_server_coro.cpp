@@ -62,3 +62,26 @@ public:
 };
 
 
+class ThreadPool {
+public:
+    explicit ThreadPool(size_t n) : stop(false) {
+        for (size_t i = 0; i < n; ++i) {
+            workers.emplace_back([this] {
+                while (true) {
+                    std::function<void()> task;
+                    {
+                        std::unique_lock lock(mtx);
+                        cv.wait(lock, [this] { return stop || !tasks.empty(); });
+                        if (stop && tasks.empty()) return;
+                        task = std::move(tasks.front());
+                        tasks.pop();
+                    }
+                    try { task(); }
+                    catch (const std::exception& e) {
+                        std::cerr << "Task error: " << e.what() << std::endl;
+                    }
+                }
+            });
+        }
+    }
+
