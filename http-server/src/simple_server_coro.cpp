@@ -180,3 +180,10 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
                 }
                 if (valread == 0) throw std::runtime_error("client disconnected");
 
+                buffer[valread] = '\0';
+                std::string input(buffer);
+                std::istringstream iss(input);
+                std::string command;
+                iss >> command;
+                std::string response;
+
