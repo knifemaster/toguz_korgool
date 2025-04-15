@@ -160,3 +160,23 @@ struct EpollAwaiter {
 
     void await_resume() const noexcept {}
 };
+
+
+Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager, 
+                      Bimap<int, int>& sockets_descriptors, 
+                      ThreadSafeMatchmaker& matchmaker) {
+    char buffer[1024];
+    SocketGuard client_guard(client_fd);
+
+    try {
+        while (true) {
+            co_await EpollAwaiter{epoll_fd, client_fd, EPOLLIN};
+
+            while (true) {
+                int valread = read(client_fd, buffer, sizeof(buffer) - 1);
+                if (valread == -1) {
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+                    throw std::runtime_error("read error");
+                }
+                if (valread == 0) throw std::runtime_error("client disconnected");
+
