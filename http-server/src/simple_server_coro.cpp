@@ -95,3 +95,20 @@ public:
         cv.notify_one();
     }
 
+    ~ThreadPool() {
+        {
+            std::lock_guard lock(mtx);
+            stop = true;
+        }
+        cv.notify_all();
+        for (auto& t : workers) if (t.joinable()) t.join();
+    }
+
+private:
+    std::vector<std::thread> workers;
+    std::queue<std::function<void()>> tasks;
+    std::mutex mtx;
+    std::condition_variable cv;
+    bool stop;
+};
+
