@@ -131,3 +131,32 @@ struct Task {
     };
 };
 
+
+struct EpollAwaiter {
+    int epoll_fd;
+    int fd;
+    uint32_t events;
+    std::coroutine_handle<> handle;
+
+    bool await_ready() const noexcept { return false; }
+
+    void await_suspend(std::coroutine_handle<> h) {
+        handle = h;
+        epoll_event ev{};
+        ev.events = events | EPOLLET;
+        ev.data.ptr = this;
+        if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, fd, &ev) == -1) {
+            if (errno == ENOENT) {
+                if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &ev) == -1) {
+                    perror("epoll_ctl ADD");
+                    std::terminate();
+                }
+            } else {
+                perror("epoll_ctl MOD");
+                std::terminate();
+            }
+        }
+    }
+
+    void await_resume() const noexcept {}
+};
