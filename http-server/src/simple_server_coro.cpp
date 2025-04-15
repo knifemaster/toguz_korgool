@@ -112,3 +112,22 @@ private:
     bool stop;
 };
 
+
+struct Task {
+    struct promise_type;
+    using handle_type = std::coroutine_handle<promise_type>;
+    handle_type coro;
+    Task(handle_type h) : coro(h) {}
+    void start() { coro.resume(); }
+
+    struct promise_type {
+        Task get_return_object() { return Task{handle_type::from_promise(*this)}; }
+        std::suspend_always initial_suspend() { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
+        void return_void() {}
+        void unhandled_exception() {
+            std::cerr << "Coroutine exception" << std::endl;
+        }
+    };
+};
+
