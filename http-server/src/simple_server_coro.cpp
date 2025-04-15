@@ -85,3 +85,13 @@ public:
         }
     }
 
+    template <class F>
+    void enqueue(F&& f) {
+        {
+            std::lock_guard lock(mtx);
+            if (stop) throw std::runtime_error("Enqueue on stopped pool");
+            tasks.emplace(std::forward<F>(f));
+        }
+        cv.notify_one();
+    }
+
