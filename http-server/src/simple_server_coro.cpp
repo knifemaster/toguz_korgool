@@ -187,3 +187,52 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
                 iss >> command;
                 std::string response;
 
+                if (command == "find_game") {
+                    int id, rating;
+                    if (iss >> id >> rating) {
+                        matchmaker.addPlayer({client_fd, id, rating, std::chrono::system_clock::now()});
+                        std::pair<Player, Player> match;
+                        if (matchmaker.tryFindMatch(match)) {
+
+                            sockets_descriptors.insert(match.second.client_fd, match.first.client_fd);
+                            
+                            manager.create_game(generate_game_id());
+                            std::cout << "fds :" << match.first.client_fd << " " << match.second.client_fd << std::endl;
+                            send(sockets_descriptors.at_left(client_fd), "Hello", 5, 0);
+                            send(match.first.client_fd, "white", 5, 0);
+                            send(match.second.client_fd, "black", 5, 0);
+                            continue;
+                        }
+                        response = "in queue";
+                    }
+                } else if (command == "echo") {
+                    std::string rest;
+                    std::getline(iss, rest);
+                    response = "Echo: " + rest + "\n";
+                } else if (command == "time") {
+                    auto now = std::chrono::system_clock::now();
+                    std::time_t t = std::chrono::system_clock::to_time_t(now);
+                    response = "Time: " + std::string(std::ctime(&t));
+                } else if (command == "pow") {
+                    double base, exp;
+                    if (iss >> base >> exp) {
+                        response = "Result: " + std::to_string(std::pow(base, exp)) + "\n";
+                    } else {
+                        response = "Usage: pow <base> <exponent>\n";
+                    }
+                }
+
+                if (!response.empty()) {
+                    if (send(client_fd, response.c_str(), response.size(), 0) == -1) {
+                        throw std::runtime_error("send failed");
+                    }
+                }
+            }
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "Client " << client_fd << " error: " << e.what() << std::endl;
+    }
+    co_return;
+}
+
+
