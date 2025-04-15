@@ -236,3 +236,24 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
 }
 
 
+void init_socket_server() {
+    GameManager manager;
+    Bimap<int, int> socket_descriptors;
+    ThreadSafeMatchmaker matchmaker;
+    ThreadPool pool(std::thread::hardware_concurrency());
+
+    SocketGuard server_guard(socket(AF_INET, SOCK_STREAM, 0));
+    if (server_guard == -1) throw std::runtime_error("socket failed");
+
+    int opt = 1;
+    setsockopt(server_guard, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    set_nonblocking(server_guard);
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    if (bind(server_guard, (sockaddr*)&address, sizeof(address)) == -1) throw std::runtime_error("bind failed");
+    if (listen(server_guard, SOMAXCONN) == -1) throw std::runtime_error("listen failed");
+
