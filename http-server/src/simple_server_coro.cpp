@@ -40,7 +40,6 @@ void set_nonblocking(int fd) {
     }
 }
 
-
 class SocketGuard {
     int fd_ = -1;
 public:
@@ -60,7 +59,6 @@ public:
     operator int() const { return fd_; }
     int release() { int fd = fd_; fd_ = -1; return fd; }
 };
-
 
 class ThreadPool {
 public:
@@ -112,7 +110,6 @@ private:
     bool stop;
 };
 
-
 struct Task {
     struct promise_type;
     using handle_type = std::coroutine_handle<promise_type>;
@@ -130,7 +127,6 @@ struct Task {
         }
     };
 };
-
 
 struct EpollAwaiter {
     int epoll_fd;
@@ -160,7 +156,6 @@ struct EpollAwaiter {
 
     void await_resume() const noexcept {}
 };
-
 
 Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager, 
                       Bimap<int, int>& sockets_descriptors, 
@@ -196,7 +191,9 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
 
                             sockets_descriptors.insert(match.second.client_fd, match.first.client_fd);
                             
-                            manager.create_game(generate_game_id());
+                            int game_id = generate_game_id();
+                            std::cout << "game_id " << game_id;
+                            manager.create_game(game_id);
                             std::cout << "fds :" << match.first.client_fd << " " << match.second.client_fd << std::endl;
                             send(sockets_descriptors.at_left(client_fd), "Hello", 5, 0);
                             send(match.first.client_fd, "white", 5, 0);
@@ -205,7 +202,18 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
                         }
                         response = "in queue";
                     }
-                } else if (command == "echo") {
+                } 
+                
+                if (command == "move") {
+                    int game_id; 
+                    int position;
+                    bool color; 
+                    if (iss >> game_id >> position >> color) {
+                        manager.make_move(game_id, position, color);
+                    } 
+                }
+
+                else if (command == "echo") {
                     std::string rest;
                     std::getline(iss, rest);
                     response = "Echo: " + rest + "\n";
@@ -235,13 +243,13 @@ Task client_coroutine(int epoll_fd, int client_fd, GameManager& manager,
     co_return;
 }
 
-
 void init_socket_server() {
     GameManager manager;
     Bimap<int, int> socket_descriptors;
     ThreadSafeMatchmaker matchmaker;
-    ThreadPool pool(std::thread::hardware_concurrency());
-
+    //ThreadPool pool(std::thread::hardware_concurrency());
+    ThreadPool pool(8);
+    
     SocketGuard server_guard(socket(AF_INET, SOCK_STREAM, 0));
     if (server_guard == -1) throw std::runtime_error("socket failed");
 
@@ -256,7 +264,6 @@ void init_socket_server() {
 
     if (bind(server_guard, (sockaddr*)&address, sizeof(address)) == -1) throw std::runtime_error("bind failed");
     if (listen(server_guard, SOMAXCONN) == -1) throw std::runtime_error("listen failed");
-
 
     SocketGuard epoll_guard(epoll_create1(0));
     if (epoll_guard == -1) throw std::runtime_error("epoll_create1 failed");
@@ -305,7 +312,6 @@ void init_socket_server() {
         }
     }
 }
-
 
 int main() {
     try {
