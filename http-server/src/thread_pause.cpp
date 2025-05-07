@@ -73,3 +73,21 @@ private:
     std::atomic<bool> is_paused;
     std::atomic<bool> should_stop;
 };
+
+
+int main() {
+    PausableThread thread;
+    thread.start();
+
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    thread.pause();
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    thread.resume();
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    thread.stop();
+
+    return 0;
+}
