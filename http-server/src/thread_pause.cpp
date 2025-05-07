@@ -50,3 +50,11 @@ public:
         cv.notify_one();
         std::cout << "Поток возобновлён\n";
     }
+
+    void stop() {
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            should_stop = true;
+        }
+        cv.notify_one();
+    }
