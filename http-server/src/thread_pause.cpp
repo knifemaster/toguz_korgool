@@ -41,3 +41,12 @@ public:
         is_paused = true;
         std::cout << "Ожидание завершения текущей задачи...\n";
     }
+
+    void resume() {
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            is_paused = false;
+        }
+        cv.notify_one();
+        std::cout << "Поток возобновлён\n";
+    }
