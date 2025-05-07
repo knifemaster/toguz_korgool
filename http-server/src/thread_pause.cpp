@@ -35,3 +35,9 @@ public:
             }
         });
     }
+
+    void pause() {
+        std::lock_guard<std::mutex> lock(mtx);
+        is_paused = true;
+        std::cout << "Ожидание завершения текущей задачи...\n";
+    }
