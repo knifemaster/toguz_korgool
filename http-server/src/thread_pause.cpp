@@ -58,3 +58,18 @@ public:
         }
         cv.notify_one();
     }
+
+
+    ~PausableThread() {
+        stop();
+        if (worker.joinable())
+            worker.join();
+    }
+
+private:
+    std::jthread worker;
+    std::mutex mtx;
+    std::condition_variable cv;
+    std::atomic<bool> is_paused;
+    std::atomic<bool> should_stop;
+};
