@@ -145,5 +145,11 @@ int main() {
 
     thread.stop();
 
+    ThreadPool pool(4); 
+    pool.enqueue([]() { std::cout << "Задача 1 (поток " << std::this_thread::get_id() << ")\n"; });
+    pool.enqueue([]() { std::cout << "Задача 2 (поток " << std::this_thread::get_id() << ")\n"; });
+    pool.enqueue([]() { std::cout << "Задача 3 (поток " << std::this_thread::get_id() << ")\n"; });
+    pool.enqueue([]() { std::cout << "Задача 4 (поток " << std::this_thread::get_id() << ")\n"; });
+
     return 0;
 }
