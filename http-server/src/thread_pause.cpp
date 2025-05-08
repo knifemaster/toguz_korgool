@@ -148,8 +148,14 @@ int main() {
     ThreadPool pool(4); 
     pool.enqueue([]() { std::cout << "Задача 1 (поток " << std::this_thread::get_id() << ")\n"; });
     pool.enqueue([]() { std::cout << "Задача 2 (поток " << std::this_thread::get_id() << ")\n"; });
-    pool.enqueue([]() { std::cout << "Задача 3 (поток " << std::this_thread::get_id() << ")\n"; });
-    pool.enqueue([]() { std::cout << "Задача 4 (поток " << std::this_thread::get_id() << ")\n"; });
+    //pool.enqueue([]() { std::cout << "Задача 3 (поток " << std::this_thread::get_id() << ")\n"; });
+    //pool.enqueue([]() { std::cout << "Задача 4 (поток " << std::this_thread::get_id() << ")\n"; });
+
+    auto multiply = []() { std::cout << "multiply" << "\n"; };
+    auto addition = []() { std::cout << "addition" << "\n"; };
+    pool.enqueue(multiply);
+    pool.enqueue(addition);
+
 
     return 0;
 }
