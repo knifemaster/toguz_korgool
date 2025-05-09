@@ -168,7 +168,14 @@ class GameManager {
             games_.push_back(game);
             cond_.notify_one();
         }
-}
+
+        void updateAllGames() {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (auto& game : games_) {
+                game.update();
+            }
+        }
+};
 
 
 
