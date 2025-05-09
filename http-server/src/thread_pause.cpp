@@ -142,76 +142,78 @@ class ThreadPool {
 #include <random>
 
 
+
 struct Game {
     int id;
-    std::string status;
-
-
+    std::string status;  // "waiting", "running", "finished"
+    
     void update() {
         if (status == "running") {
             static std::random_device rd;
             static std::mt19937 gen(rd());
             static std::uniform_int_distribution<> dis(1, 10);
-
+            
             if (dis(gen) > 7) {
-                status = "finished"
+                status = "finished";
             }
         }
     }
 };
 
-
 class GameManager {
-    public:
-        void addGame(const Game& game) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            games_.push_back(game);
-            cond_.notify_one();
+public:
+    void addGame(const Game& game) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        games_.push_back(game);
+        cond_.notify_one();
+    }
+
+    void updateAllGames() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto& game : games_) {
+            game.update();
         }
+    }
 
-        void updateAllGames() {
-            std::lock_guard<std::mutex> lock(mutex_);
-            for (auto& game : games_) {
-                game.update();
-            }
+    void removeFinishedGames() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        games_.erase(
+            std::remove_if(
+                games_.begin(), 
+                games_.end(),
+                [](const Game& g) { return g.status == "finished"; }
+            ),
+            games_.end()
+        );
+    }
+
+    void waitForGames() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cond_.wait(lock, [this]() { return !games_.empty(); });
+    }
+
+    void printGames() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (const auto& game : games_) {
+            std::cout << "Game " << game.id << ": " << game.status << std::endl;
         }
+    }
 
-        void removeFinishedGames() {
-            std::lock_guard<std::mutex> lock(mutex_);
-            auto it = std::remove_if(games_.begin(), games_.end(),[](const Game& g) { return g.status == "finished";});
-            games_.erase(it, games_.end());
-        }
-
-        void waitForGames() {
-            std::unique_lock<std::mutex> lock(mutex_);
-            cond_.wait(lock, [this]() { return !games_.empty(); });
-        }
-
-        const std::vector<Game>& getGames() const { return games_; }
-
-
-    private:
-        std::vector<Game> games_;
-        mutable std::mutex mutex_;
-        std::condition_variable cond_;
+private:
+    std::vector<Game> games_;
+    mutable std::mutex mutex_;
+    std::condition_variable cond_;
 };
-
 
 void gameScanner(GameManager& manager) {
     while (true) {
         manager.waitForGames();
         manager.updateAllGames();
         manager.removeFinishedGames();
-        {
-            std::lock_guard<std::mutex> lock(manager.getMutex());
-            for (const auto& game : manager.getGames()) {
-                std::cout << "Game " << game.id << ": " << game.status << std::endl;
-            }
-        }
+        manager.printGames();
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
-
 
 void gameCreator(GameManager& manager) {
     static int gameId = 0;
@@ -254,6 +256,13 @@ int main() {
     pool.enqueue(multiply);
     pool.enqueue(addition);
     
+
+    GameManager manager;
+    std::thread scanner(gameScanner, std::ref(manager));
+    std::thread creator(gameCreator, std::ref(manager));
+    scanner.join();
+    creator.join();
+
 
     return 0;
 }
