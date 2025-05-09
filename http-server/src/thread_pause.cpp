@@ -148,12 +148,21 @@ struct Game {
     std::string status;  // "waiting", "running", "finished"
     
     void update() {
-        if (status == "running") {
+        if (status == "waiting") {
             static std::random_device rd;
             static std::mt19937 gen(rd());
-            static std::uniform_int_distribution<> dis(1, 10);
+            static std::uniform_int_distribution<> dis(0, 1);
             
-            if (dis(gen) > 7) {
+            if (dis(gen) == 1) {
+                status = "running";
+            }
+        }
+        else if (status == "running") {
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            static std::uniform_int_distribution<> dis(1, 5);
+            
+            if (dis(gen) == 1) {
                 status = "finished";
             }
         }
@@ -211,7 +220,7 @@ void gameScanner(GameManager& manager) {
         manager.updateAllGames();
         manager.removeFinishedGames();
         manager.printGames();
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 }
 
@@ -221,9 +230,9 @@ void gameCreator(GameManager& manager) {
         Game newGame{gameId++, "waiting"};
         manager.addGame(newGame);
         std::cout << "Created Game " << newGame.id << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-}
+}            
 
 
 int main() {
