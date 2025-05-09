@@ -186,6 +186,14 @@ class GameManager {
             std::unique_lock<std::mutex> lock(mutex_);
             cond_.wait(lock, [this]() { return !games_.empty(); });
         }
+
+        const std::vector<Game>& getGames() const { return games_; }
+
+
+    private:
+        std::vector<Game> games_;
+        mutable std::mutex mutex_;
+        std::condition_variable cond_;
 };
 
 
