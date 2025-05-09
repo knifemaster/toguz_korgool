@@ -6,7 +6,10 @@
 #include <vector>
 #include <queue>
 #include <functional>
+#include <unordered_map>
+#include <string>
 
+std::unordered_map<int, std::string> umap = { {1, "one"}, {2, "two"}, {3, "three"}};
 
 class PausableThread {
 public:
@@ -14,7 +17,8 @@ public:
 
     void start() {
         worker = std::jthread([this](std::stop_token stoken) {
-            while (!should_stop && !stoken.stop_requested()) {
+        	
+	    while (!should_stop && !stoken.stop_requested()) {
                 {
                     std::unique_lock<std::mutex> lock(mtx);
                     cv.wait(lock, [this, &stoken] {
@@ -130,6 +134,37 @@ class ThreadPool {
 };
 
 
+#include <string>
+#include <vector>
+#include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <random>
+
+
+struct Game {
+    int id;
+    std::string status;
+
+
+    void update() {
+        if (status == "running") {
+            static std::random_device rd;
+            static std::mt19937 gen(rd());
+            static std::uniform_int_distribution<> dis(1, 10);
+
+            if (dis(gen) > 7) {
+                status = "finished"
+            }
+        }
+    }
+};
+
+
+
+
+
+
 int main() {
 
     PausableThread thread;
@@ -151,11 +186,15 @@ int main() {
     //pool.enqueue([]() { std::cout << "Задача 3 (поток " << std::this_thread::get_id() << ")\n"; });
     //pool.enqueue([]() { std::cout << "Задача 4 (поток " << std::this_thread::get_id() << ")\n"; });
 
-    auto multiply = []() { std::cout << "multiply" << "\n"; };
-    auto addition = []() { std::cout << "addition" << "\n"; };
+    auto multiply = []() { std::cout << "multiply " << std::this_thread::get_id() <<"\n"; 
+        for (const auto& [key, value] : umap) {
+            std::cout << key << " " << value << std::endl;
+        }
+    };
+    auto addition = []() { std::cout << "addition " << std::this_thread::get_id() <<"\n"; };
     pool.enqueue(multiply);
     pool.enqueue(addition);
-
+    
 
     return 0;
 }
