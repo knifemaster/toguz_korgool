@@ -197,6 +197,22 @@ class GameManager {
 };
 
 
+void gameScanner(GameManager& manager) {
+    while (true) {
+        manager.waitForGames();
+        manager.updateAllGames();
+        manager.removeFinishedGames();
+        {
+            std::lock_guard<std::mutex> lock(manager.getMutex());
+            for (const auto& game : manager.getGames()) {
+                std::cout << "Game " << game.id << ": " << game.status << std::endl;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+
 
 int main() {
 
