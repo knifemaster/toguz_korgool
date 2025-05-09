@@ -161,7 +161,14 @@ struct Game {
 };
 
 
-
+class GameManager {
+    public:
+        void addGame(const Game& game) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            games_.push_back(game);
+            cond_.notify_one();
+        }
+}
 
 
 
