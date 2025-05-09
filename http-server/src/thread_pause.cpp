@@ -181,6 +181,11 @@ class GameManager {
             auto it = std::remove_if(games_.begin(), games_.end(),[](const Game& g) { return g.status == "finished";});
             games_.erase(it, games_.end());
         }
+
+        void waitForGames() {
+            std::unique_lock<std::mutex> lock(mutex_);
+            cond_.wait(lock, [this]() { return !games_.empty(); });
+        }
 };
 
 
