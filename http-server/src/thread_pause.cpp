@@ -175,6 +175,12 @@ class GameManager {
                 game.update();
             }
         }
+
+        void removeFinishedGames() {
+            std::lock_guard<std::mutex> lock(mutex_);
+            auto it = std::remove_if(games_.begin(), games_.end(),[](const Game& g) { return g.status == "finished";});
+            games_.erase(it, games_.end());
+        }
 };
 
 
