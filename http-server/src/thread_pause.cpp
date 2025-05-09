@@ -213,6 +213,16 @@ void gameScanner(GameManager& manager) {
 }
 
 
+void gameCreator(GameManager& manager) {
+    static int gameId = 0;
+    while (true) {
+        Game newGame{gameId++, "waiting"};
+        manager.addGame(newGame);
+        std::cout << "Created Game " << newGame.id << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+    }
+}
+
 
 int main() {
 
