@@ -282,3 +282,41 @@ public:
     }
 };
 
+
+int main() {
+    ToguzKorgoolGame game;
+    
+    std::cout << "=== Toguz Korgool Game ===\n";
+    std::cout << "Movement: Counter-clockwise (against the clock)\n";
+    std::cout << "Top side: moves left to right (0→1→2→...→8)\n";
+    std::cout << "Down side: moves right to left (8→7→6→...→0)\n";
+    std::cout << "Initial state:\n";
+    game.print_board();
+    
+    // Пример игры
+    std::vector<std::pair<int, bool>> moves = {
+        {3, true},   // Игрок 1 ходит из лунки 3 (30 коргоолов)
+        {1, false},  // Игрок 2 ходит из лунки 1
+        {5, true},   // Игрок 1 ходит из лунки 5
+        {4, false},  // Игрок 2 ходит из лунки 4
+        {0, true},   // Игрок 1 ходит из лунки 0
+        {2, false}   // Игрок 2 ходит из лунки 2
+    };
+    
+    for (size_t i = 0; i < moves.size() && !game.is_game_over(); ++i) {
+        if (!game.move(i + 1, moves[i].first, moves[i].second)) {
+            std::cout << "Move failed!\n";
+            break;
+        }
+        
+        auto scores = game.get_scores();
+        std::cout << "Scores: Player 1: " << scores.first 
+                  << ", Player 2: " << scores.second << "\n";
+        
+        // Пауза для читабельности
+        std::cout << "Press Enter to continue...\n";
+        std::cin.get();
+    }
+    
+    return 0;
+}
