@@ -362,3 +362,281 @@ public:
     }
 };
 
+
+// Класс для управления играми
+class GameManager {
+private:
+    std::unordered_map<int, std::unique_ptr<ToguzKorgoolGame>> games;
+    mutable std::mutex games_mutex;
+    mutable std::mutex id_generation_mutex;
+    std::mt19937 random_gen;
+    int next_id = 1;
+
+    // Потокобезопасная генерация уникального ID игры
+    int generate_game_id() {
+        std::lock_guard<std::mutex> lock(id_generation_mutex);
+        return next_id++;
+    }
+
+public:
+    GameManager() : random_gen(std::chrono::steady_clock::now().time_since_epoch().count()) {}
+
+    // Установить последний ID игры из базы данных
+    void set_last_game_id_from_db(int id) {
+        std::lock_guard<std::mutex> lock(id_generation_mutex);
+        next_id = id + 1;
+    }
+
+    // Создать новую игру
+    int create_game() {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        int game_id = generate_game_id();
+        games[game_id] = std::make_unique<ToguzKorgoolGame>(game_id);
+        
+        std::cout << "Created new game with ID: " << game_id << "\n";
+        return game_id;
+    }
+
+    // Получить игру по ID
+    ToguzKorgoolGame* get_game(int game_id) {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.find(game_id);
+        if (it != games.end()) {
+            return it->second.get();
+        }
+        
+        return nullptr;
+    }
+
+    // Начать игру
+    bool start_game(int game_id) {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.find(game_id);
+        if (it != games.end()) {
+            it->second->start_game();
+            return true;
+        }
+        
+        return false;
+    }
+
+    // Прервать игру
+    bool abandon_game(int game_id) {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.find(game_id);
+        if (it != games.end()) {
+            it->second->abandon_game();
+            return true;
+        }
+        
+        return false;
+    }
+
+    // Получить статус игры
+    GameStatus get_game_status(int game_id) const {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.find(game_id);
+        if (it != games.end()) {
+            return it->second->get_status();
+        }
+        
+        return GameStatus::ABANDONED;
+    }
+
+    // Удалить игру
+    bool remove_game(int game_id) {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.find(game_id);
+        if (it != games.end()) {
+            games.erase(it);
+            std::cout << "Game with ID " << game_id << " removed.\n";
+            return true;
+        }
+        
+        return false;
+    }
+
+    // Получить список всех игр
+    std::vector<int> get_all_game_ids() const {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        std::vector<int> game_ids;
+        game_ids.reserve(games.size());
+        
+        for (const auto& pair : games) {
+            game_ids.push_back(pair.first);
+        }
+        
+        return game_ids;
+    }
+
+    // Получить количество активных игр
+    size_t get_games_count() const {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        return games.size();
+    }
+
+    // Очистить все игры
+    void clear_all_games() {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        games.clear();
+        std::cout << "All games cleared.\n";
+    }
+
+    // Удалить завершенные игры
+    void remove_finished_games() {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        auto it = games.begin();
+        while (it != games.end()) {
+            GameStatus status = it->second->get_status();
+            if (status != GameStatus::WAITING_FOR_PLAYERS && status != GameStatus::IN_PROGRESS) {
+                std::cout << "Removing finished game: " << it->first << " (Status: " 
+                          << ToguzKorgoolGame::status_to_string(status) << ")\n";
+                it = games.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    // Получить игры по статусу
+    std::vector<int> get_games_by_status(GameStatus status) const {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        std::vector<int> game_ids;
+        for (const auto& pair : games) {
+            if (pair.second->get_status() == status) {
+                game_ids.push_back(pair.first);
+            }
+        }
+        
+        return game_ids;
+    }
+
+    // Показать статистику всех игр
+    void show_games_stats() const {
+        std::lock_guard<std::mutex> lock(games_mutex);
+        
+        std::cout << "\n=== Games Statistics ===\n";
+        std::cout << "Total games: " << games.size() << "\n";
+        
+        std::unordered_map<GameStatus, int> status_count;
+        for (const auto& pair : games) {
+            status_count[pair.second->get_status()]++;
+        }
+        
+        std::cout << "Games by status:\n";
+        for (const auto& [status, count] : status_count) {
+            std::cout << "  " << ToguzKorgoolGame::status_to_string(status) << ": " << count << "\n";
+        }
+        
+        if (!games.empty()) {
+            std::cout << "\nDetailed game info:\n";
+            for (const auto& pair : games) {
+                auto scores = pair.second->get_scores();
+                GameStatus status = pair.second->get_status();
+                std::cout << "  Game " << pair.first 
+                          << " - Status: " << ToguzKorgoolGame::status_to_string(status)
+                          << " - Moves: " << pair.second->get_move_count()
+                          << " - Score: P1:" << scores.first << " P2:" << scores.second << "\n";
+            }
+        }
+    }
+
+    // Автоматическая игра со случайными ходами
+    void play_automatic_game(int game_id, bool show_moves = false) {
+        ToguzKorgoolGame* game = get_game(game_id);
+        if (!game) {
+            std::cout << "Game " << game_id << " not found!\n";
+            return;
+        }
+
+        start_game(game_id);
+        
+        if (show_moves) {
+            std::cout << "\n=== Starting automatic game " << game_id << " ===\n";
+            game->print_board();
+        }
+
+        bool current_player_top = true;
+        std::uniform_int_distribution<> delay_dist(10, 20);
+
+        while (!game->is_game_over()) {
+            // Получаем доступные ходы для текущего игрока
+            std::vector<int> available_moves = game->get_available_moves(current_player_top);
+            
+            if (available_moves.empty()) {
+                if (show_moves) {
+                    std::cout << "No moves available for Player " << (current_player_top ? "1" : "2") << "\n";
+                }
+                break;
+            }
+
+            // Выбираем случайный ход
+            std::uniform_int_distribution<> move_dist(0, available_moves.size() - 1);
+            int chosen_move = available_moves[move_dist(random_gen)];
+
+            // Выполняем ход
+            bool move_success = game->move(game->get_move_count() + 1, chosen_move, current_player_top);
+            
+            if (move_success) {
+                if (show_moves) {
+                    std::cout << "Player " << (current_player_top ? "1" : "2") 
+                              << " moves from hole " << chosen_move << "\n";
+                    
+                    auto scores = game->get_scores();
+                    std::cout << "Scores: P1:" << scores.first << " P2:" << scores.second << "\n";
+                }
+                
+                // Меняем игрока
+                current_player_top = !current_player_top;
+                
+                // Небольшая задержка для наглядности
+                std::this_thread::sleep_for(std::chrono::milliseconds(delay_dist(random_gen)));
+            } else {
+                if (show_moves) {
+                    std::cout << "Move failed!\n";
+                }
+                break;
+            }
+        }
+
+        if (show_moves) {
+            std::cout << "\n=== Game " << game_id << " finished ===\n";
+            game->print_board();
+            std::cout << "Final status: " << ToguzKorgoolGame::status_to_string(game->get_status()) << "\n";
+        }
+    }
+
+    // Создать и запустить несколько автоматических игр
+    void create_and_play_multiple_games(int num_games, bool show_moves = false) {
+        std::cout << "\n=== Creating and playing " << num_games << " automatic games ===\n";
+        
+        std::vector<int> game_ids;
+        
+        // Создаем игры
+        for (int i = 0; i < num_games; ++i) {
+            int game_id = create_game();
+            game_ids.push_back(game_id);
+        }
+        
+        // Запускаем игры
+        for (int game_id : game_ids) {
+            if (show_moves) {
+                std::cout << "\n--- Playing game " << game_id << " ---\n";
+            }
+            play_automatic_game(game_id, show_moves);
+        }
+        
+        std::cout << "\n=== All games completed ===\n";
+        show_games_stats();
+    }
+};
+
