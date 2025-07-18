@@ -640,3 +640,46 @@ public:
     }
 };
 
+
+int main() {
+    GameManager game_manager;
+    
+    std::cout << "=== Toguz Korgool Game Manager with Fixed TUZ Logic ===\n";
+    std::cout << "Movement: Counter-clockwise (against the clock)\n";
+    std::cout << "Top side: moves left to right (0→1→2→...→8)\n";
+    std::cout << "Down side: moves right to left (8→7→6→...→0)\n";
+    std::cout << "TUZ Logic: -1 = no tuz, 0-8 = tuz position\n\n";
+    
+    // Установка начального ID
+    game_manager.set_last_game_id_from_db(100);
+    
+    // Создаем и запускаем несколько автоматических игр
+    game_manager.create_and_play_multiple_games(3, true);
+    
+    std::cout << "\n=== Creating more games for statistics ===\n";
+    
+    // Создаем еще больше игр для демонстрации
+    game_manager.create_and_play_multiple_games(7, false);
+    
+    // Показываем финальную статистику
+    std::cout << "\n=== Final Statistics ===\n";
+    game_manager.show_games_stats();
+    
+    // Демонстрация поиска игр по статусу
+    std::cout << "\n=== Games by Status ===\n";
+    auto finished_games = game_manager.get_games_by_status(GameStatus::PLAYER1_WINS);
+    std::cout << "Player 1 wins: " << finished_games.size() << "\n";
+    
+    finished_games = game_manager.get_games_by_status(GameStatus::PLAYER2_WINS);
+    std::cout << "Player 2 wins: " << finished_games.size() << "\n";
+    
+    finished_games = game_manager.get_games_by_status(GameStatus::DRAW);
+    std::cout << "Draws: " << finished_games.size() << "\n";
+    
+    // Очищаем завершенные игры
+    std::cout << "\n=== Removing finished games ===\n";
+    game_manager.remove_finished_games();
+    game_manager.show_games_stats();
+    
+    return 0;
+}
