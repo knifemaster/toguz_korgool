@@ -277,6 +277,28 @@ public:
         start_time = std::chrono::steady_clock::now();
     }
 
+    int get_top_player_kazan_total_gains() const {
+        return top_player_total_kazan_gain;
+    }
+
+    int get_down_player_kazan_total_gains() const {
+        return down_player_total_kazan_gain;
+    }
+
+    std::vector<int>& get_top_player_kazan_gains() {
+        return top_player_kazan_gains;
+    }
+
+    std::vector<int>& get_down_player_kazan_gains() {
+        return down_player_kazan_gains;
+    }
+
+    int  get_top_player_tuz_kazan_gain() {
+        return top_player_tuz_kazan_gain;
+    }
+    int get_down_player_tuz_kazan_gain() {
+        return down_player_tuz_kazan_gain;
+    }  
 
     std::shared_ptr<Ring> get_board() {
         return board;
@@ -655,6 +677,57 @@ private:
     }
     
     float calculateTuzProb(int hole, bool is_top_player) {
+
+        if (hole == 8) return 0.0f;
+    
+        auto tuz_pos = game->get_tuz_positions();
+        int my_tuz = is_top_player ? tuz_pos.first : tuz_pos.second;
+        if (my_tuz != -1) return 0.0f;
+        
+        const auto& board = game->get_board();
+        const auto& my_side = is_top_player ? board->top : board->down;
+        const auto& opp_side = is_top_player ? board->down : board->top;
+        
+        int korgools = my_side[hole];
+        if (korgools == 0) return 0.0f;
+        
+        // Быстрый расчет финальной позиции по модульной арифметике
+        int total_positions = 18; // 9 + 9 лунок
+        int steps_from_start = korgools;
+        
+        // Позиция на развернутой доске (0-17)
+        int linear_start = is_top_player ? hole : (17 - hole);
+        int final_linear_pos = (linear_start + steps_from_start) % total_positions;
+        
+        // Конвертируем обратно в координаты доски
+        bool lands_on_opponent;
+        int final_hole;
+        
+        if (is_top_player) {
+            if (final_linear_pos <= 8) {
+                lands_on_opponent = false;
+                final_hole = final_linear_pos;
+            } else {
+                lands_on_opponent = true;
+                final_hole = 17 - final_linear_pos;
+            }
+        } else {
+            if (final_linear_pos <= 8) {
+                lands_on_opponent = true;
+                final_hole = 8 - final_linear_pos;
+            } else {
+                lands_on_opponent = false;
+                final_hole = final_linear_pos - 9;
+            }
+        }
+        
+        // Проверяем условия туза
+        if (!lands_on_opponent || final_hole == 8) return 0.0f;
+        
+        int final_count = opp_side[final_hole] + 1;
+        return (final_count == 3) ? 1.0f : 0.0f;
+
+        /*
         // Вероятность получить туз при данном ходе
         // Туз можно получить только на стороне противника и не в 9-й лунке
         if (hole == 8) return 0.0f; // Нельзя в 9-й лунке
@@ -672,6 +745,9 @@ private:
         if (korgools == 3) return 0.4f;
         if (korgools == 2 || korgools == 4) return 0.2f;
         return 0.05f;
+        */
+
+
     }
     
     float calculateExpectedGain(int hole, bool is_top_player) {
@@ -1408,6 +1484,8 @@ public:
         // (упрощенная версия для демонстрации)
         for (int epoch = 0; epoch < epochs; ++epoch) {
             for (size_t i = 0; i < inputs.size(); ++i) {
+
+                
                 // Прямой проход и расчет градиентов
                 // Обратный проход и обновление весов
                 // (полная реализация требует больше кода)
@@ -1547,20 +1625,101 @@ private:
                   << ", declare_threshold: " << params.tuz_declare_threshold << "\n";
     }
     
-    void analyze_move_patterns() {
-        // Анализ паттернов ходов
-        int p1_max_gain = stats.max_single_move_gain_p1;
-        int p2_max_gain = stats.max_single_move_gain_p2;
-        
-        // Если максимальный выигрыш за ход слишком большой, увеличиваем важность вероятности захвата
-        if (std::max(p1_max_gain, p2_max_gain) > 15) {
-            params.capture_prob_weight *= 1.2f;
-            params.expected_gain_weight *= 0.9f;
-        }
-        
-        std::cout << "Adjusted move selection weights - capture_prob: " << params.capture_prob_weight
-                  << ", expected_gain: " << params.expected_gain_weight << "\n";
+void analyze_move_patterns() {
+    
+    // расскоментить и добавить в GameStatistics поля
+    // 1. Базовый анализ экстремальных значений
+
+    /*
+    int p1_max_gain = stats.max_single_move_gain_p1;
+    int p2_max_gain = stats.max_single_move_gain_p2;
+    int max_gain = std::max(p1_max_gain, p2_max_gain);
+    
+    // 2. Анализ распределения выигрышей
+    //float p1_gain_variance = calculate_variance(stats.player1_kazan_gains);
+    //float p2_gain_variance = calculate_variance(stats.player2_kazan_gains);
+    //bool high_variance = (p1_gain_variance > 25.0f) || (p2_gain_variance > 25.0f);
+
+    // 3. Анализ серийных паттернов (стриков)
+    //int p1_streak = detect_capture_streak(stats.player1_kazan_gains, 3);
+    //int p2_streak = detect_capture_streak(stats.player2_kazan_gains, 3);
+    //bool streak_detected = (p1_streak >= 2) || (p2_streak >= 2);
+
+    // 4. Анализ эффективности тузов
+    float tuz_efficiency_p1 = stats.total_tuz_kazan_gain_p1 / float(stats.move_count_p1 + 1);
+    float tuz_efficiency_p2 = stats.total_tuz_kazan_gain_p2 / float(stats.move_count_p2 + 1);
+    bool tuz_dominant = std::abs(tuz_efficiency_p1 - tuz_efficiency_p2) > 0.5f;
+
+    // 5. Многофакторная корректировка весов
+    float capture_adjustment = 1.0f;
+    float gain_adjustment = 1.0f;
+    
+    // Фактор 1: Экстремальные значения
+    if (max_gain > 15) {
+        float severity = std::min(2.0f, max_gain / 10.0f);
+        capture_adjustment *= 1.0f + 0.1f * severity;
+        gain_adjustment *= 1.0f - 0.05f * severity;
     }
+
+    // Фактор 2: Высокая дисперсия
+    //if (high_variance) {
+    //    capture_adjustment *= 1.15f;
+    //    gain_adjustment *= 0.85f;
+    //}
+
+    // Фактор 3: Обнаруженные стрики
+    //if (streak_detected) {
+    //    float streak_factor = 1.0f + 0.05f * std::max(p1_streak, p2_streak);
+    //    capture_adjustment *= streak_factor;
+    //}
+
+    // Фактор 4: Доминирование тузов
+    if (tuz_dominant) {
+        if (tuz_efficiency_p1 > tuz_efficiency_p2) {
+            capture_adjustment *= 1.1f;
+        } else {
+            gain_adjustment *= 1.1f; // Увеличиваем важность материального выигрыша против туза
+        }
+    }
+
+    // Фактор 5: Фаза игры
+    if (game_phase == ENDGAME) {
+        capture_adjustment *= 1.2f;
+    } else if (game_phase == OPENING) {
+        gain_adjustment *= 1.1f;
+    }
+
+    // Применяем коррекцию с ограничениями
+    params.capture_prob_weight = std::clamp(params.capture_prob_weight * capture_adjustment, 0.5f, 2.0f);
+    params.expected_gain_weight = std::clamp(params.expected_gain_weight * gain_adjustment, 0.7f, 1.8f);
+
+    // Логирование для анализа
+    std::cout << "Move patterns analysis:\n"
+              << "  Max gains: P1=" << p1_max_gain << " P2=" << p2_max_gain << "\n"
+    //          << "  Variance: P1=" << p1_gain_variance << " P2=" << p2_gain_variance << "\n"
+              << "  Capture streaks: P1=" << p1_streak << " P2=" << p2_streak << "\n"
+              << "  Tuz efficiency: P1=" << tuz_efficiency_p1 << " P2=" << tuz_efficiency_p2 << "\n"
+              << "  Adjustments: capture=" << capture_adjustment << " gain=" << gain_adjustment << "\n"
+              << "  New weights: capture_prob=" << params.capture_prob_weight 
+              << ", expected_gain=" << params.expected_gain_weight << "\n";
+
+              */
+}
+
+// Вспомогательные функции
+int detect_capture_streak(const std::vector<int>& gains, int min_gain) {
+    int current_streak = 0;
+    int max_streak = 0;
+    for (int gain : gains) {
+        if (gain >= min_gain) {
+            current_streak++;
+            max_streak = std::max(max_streak, current_streak);
+        } else {
+            current_streak = 0;
+        }
+    }
+    return max_streak;
+}
     
     void analyze_position_evaluations() {
         // Анализ оценок позиций из сыгранных игр
@@ -1742,10 +1901,76 @@ private:
     
     void save_experience(const Ring& state, int action, float eval_before, 
                         float eval_after, bool is_top_player, bool is_terminal) {
+    
+
         // В реальной реализации здесь бы сохранялись данные для обучения с подкреплением
         // (state, action, reward, new_state, is_terminal)
     }
     
+
+void analyze_episode(int game_id) {
+    ToguzKorgoolGame* game = game_manager.get_game(game_id);
+    GameStatus status = game->get_status();
+    int game_ids = game->get_game_id();
+    std::pair<int, int> score = game->get_scores();
+    
+    const int MAX_KORGOOL = 82;
+    const float BASE_REWARD = 1.0f;
+
+    auto calculate_reward = [MAX_KORGOOL, BASE_REWARD](int korgools) {
+        float ratio = korgools / static_cast<float>(MAX_KORGOOL);
+        return BASE_REWARD * std::pow(ratio, 2);
+    };
+
+    // Сумма вознаграждения первого игрока
+    double top_player_gained_korgools_reward_total = 0.0;
+    for (int& gained_korgools : game->get_top_player_kazan_gains()) {
+        top_player_gained_korgools_reward_total += calculate_reward(gained_korgools);
+    }
+
+    // Сумма вознаграждения второго игрока
+    double down_player_gained_korgools_reward_total = 0.0;
+    for (int& gained_korgools : game->get_down_player_kazan_gains()) {
+        down_player_gained_korgools_reward_total += calculate_reward(gained_korgools);
+    }
+
+    // Вознаграждение через туз
+    double p1_gain_through_tuz = calculate_reward(game->get_top_player_tuz_kazan_gain());
+    double p2_gain_through_tuz = calculate_reward(game->get_down_player_tuz_kazan_gain());
+
+    float reward_p1 = 0.0f;
+    float reward_p2 = 0.0f;
+    
+    switch (status) {
+        case GameStatus::PLAYER1_WINS:
+            reward_p1 = top_player_gained_korgools_reward_total + p1_gain_through_tuz;
+            std::cout << "====================== total reward for player 1 ==================== " << reward_p1 << std::endl;
+            std::cout << "first player score: " << score.first << std::endl;
+            std::cout << "second player score: " << score.second << std::endl;
+            std::cout << "game id " << game_ids << std::endl;
+            reward_p2 = -1.0f;
+            break;
+        case GameStatus::PLAYER2_WINS:
+            reward_p1 = -1.0f;
+            reward_p2 = down_player_gained_korgools_reward_total + p2_gain_through_tuz;
+            std::cout << "====================== total reward for player 2 ==================== " << reward_p2 << std::endl;
+            std::cout << "first player score: " << score.first << std::endl;
+            std::cout << "second player score: " << score.second << std::endl;
+            std::cout << "game id " << game_ids << std::endl;
+            break;
+        case GameStatus::DRAW:
+            // Обработка ничьи
+            break;
+        default:
+            break;
+    }
+    
+    // Обновление модели  // Обновляем модель (DQN, PPO и т. д.)
+}
+
+    
+
+    /*
     void analyze_episode(int game_id) {
         ToguzKorgoolGame* game = game_manager.get_game(game_id);
         GameStatus status = game->get_status();
@@ -1774,6 +1999,8 @@ private:
         // Обновляем модель на основе наград
         // (в реальной реализации здесь бы использовался алгоритм Q-learning или Policy Gradient)
     }
+    */
+   
 };
 
 
