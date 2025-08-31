@@ -1,0 +1,229 @@
+{
+  "protocol": {
+    "name": "Simple Coro Server Protocol",
+    "version": "1.0",
+    "description": "JSON-based protocol for communication with the simple coroutine server"
+  },
+  "messageFormat": {
+    "request": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the request"
+        },
+        "command": {
+          "type": "string",
+          "description": "Command to execute on the server"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Parameters for the command"
+        }
+      },
+      "required": ["id", "command"]
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier matching the request"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["success", "error"],
+          "description": "Status of the command execution"
+        },
+        "result": {
+          "type": ["string", "number", "object", "array", "null"],
+          "description": "Result of the command execution"
+        },
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "integer",
+              "description": "Error code"
+            },
+            "message": {
+              "type": "string",
+              "description": "Error message"
+            }
+          }
+        }
+      },
+      "required": ["id", "status"]
+    }
+  },
+  "commands": [
+    {
+      "name": "echo",
+      "description": "Echoes back the provided text",
+      "request": {
+        "parameters": {
+          "text": {
+            "type": "string",
+            "description": "Text to echo back"
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "type": "string",
+          "description": "The echoed text"
+        }
+      },
+      "examples": [
+        {
+          "request": {
+            "id": "1",
+            "command": "echo",
+            "parameters": {
+              "text": "Hello, World!"
+            }
+          },
+          "response": {
+            "id": "1",
+            "status": "success",
+            "result": "Hello, World!"
+          }
+        }
+      ]
+    },
+    {
+      "name": "time",
+      "description": "Returns the current server time",
+      "request": {
+        "parameters": {}
+      },
+      "response": {
+        "result": {
+          "type": "string",
+          "description": "Current server time in ISO format"
+        }
+      },
+      "examples": [
+        {
+          "request": {
+            "id": "2",
+            "command": "time",
+            "parameters": {}
+          },
+          "response": {
+            "id": "2",
+            "status": "success",
+            "result": "2025-08-31T10:30:45Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "message",
+      "description": "Returns a predefined message from the server",
+      "request": {
+        "parameters": {}
+      },
+      "response": {
+        "result": {
+          "type": "string",
+          "description": "Predefined server message"
+        }
+      },
+      "examples": [
+        {
+          "request": {
+            "id": "3",
+            "command": "message",
+            "parameters": {}
+          },
+          "response": {
+            "id": "3",
+            "status": "success",
+            "result": "Server says hello!"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pow",
+      "description": "Calculates the power of a base number raised to an exponent",
+      "request": {
+        "parameters": {
+          "base": {
+            "type": "number",
+            "description": "The base number"
+          },
+          "exponent": {
+            "type": "number",
+            "description": "The exponent"
+          }
+        }
+      },
+      "response": {
+        "result": {
+          "type": "number",
+          "description": "Result of base raised to the exponent"
+        }
+      },
+      "examples": [
+        {
+          "request": {
+            "id": "4",
+            "command": "pow",
+            "parameters": {
+              "base": 2,
+              "exponent": 3
+            }
+          },
+          "response": {
+            "id": "4",
+            "status": "success",
+            "result": 8
+          }
+        }
+      ]
+    },
+    {
+      "name": "exit",
+      "description": "Disconnects the client",
+      "request": {
+        "parameters": {}
+      },
+      "response": {
+        "result": {
+          "type": "string",
+          "description": "Goodbye message"
+        }
+      },
+      "examples": [
+        {
+          "request": {
+            "id": "5",
+            "command": "exit",
+            "parameters": {}
+          },
+          "response": {
+            "id": "5",
+            "status": "success",
+            "result": "Goodbye!"
+          }
+        }
+      ]
+    }
+  ],
+  "errorCodes": [
+    {
+      "code": 400,
+      "message": "Invalid request format"
+    },
+    {
+      "code": 404,
+      "message": "Command not found"
+    },
+    {
+      "code": 500,
+      "message": "Internal server error"
+    }
+  ]
+}
