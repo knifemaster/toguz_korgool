@@ -7,17 +7,14 @@
 #include <random>
 #include <chrono>
 #include <thread>
-#include <print>
 #include <iomanip>
 #include <algorithm>
 #include <tuple>
 #include <climits>
-
 #include <map>
 #include <cmath>
 #include <fstream>
 #include <numeric>
-
 
 class Ring {
 public:
@@ -26,10 +23,8 @@ public:
     int top_kazan = 0;    // Казан первого игрока
     int down_kazan = 0;   // Казан второго игрока
 
-
     int top_tuz_position = -1;
     int down_tuz_position = -1;
-
 
     mutable std::unordered_map<uint64_t, float> tuz_probability_cache;
     
@@ -269,776 +264,6 @@ public:
             std::cout << "\n";
         }
     }
-
-    std::vector<std::pair<int, float>> getBestTuzMovesVariations(bool is_top_player, int top_n = 3) const {
-        std::vector<std::pair<int, float>> moves;
-        for (int hole = 0; hole < 9; hole++) {
-            float prob = getTuzProbability(hole, is_top_player);
-            if (prob > 0.0f) {
-                moves.emplace_back(std::pair {hole, prob});
-            }
-        }
-        
-        // Сортируем по убыванию вероятности
-        std::sort(moves.begin(), moves.end(), 
-                 [](const auto& a, const auto& b) { return a.second > b.second; });
-        
-        // Возвращаем топ N
-        if (moves.size() > static_cast<size_t>(top_n)) {
-            moves.resize(top_n);
-        }
-        
-        return moves;
-    }
-    
-    // Очистить кэш (полезно при изменении состояния доски)
-    void clearTuzCache() {
-        tuz_probability_cache.clear();
-    }
-    
-    // Установить позицию туза
-    void setTuzPosition(bool is_top_player, int position) {
-        if (is_top_player) {
-            top_tuz_position = position;
-        } else {
-            down_tuz_position = position;
-        }
-        clearTuzCache(); // Очищаем кэш при изменении тузов
-    }
-    
-    // Быстрый расчет вероятности туза без полной симуляции
-    float calculateTuzProbabilityFast(int hole, bool is_top_player, int korgools) const {
-        const auto& opp_side = is_top_player ? down : top;
-        
-        // Вычисляем финальную позицию математически
-        int total_positions = 18; // 9 + 9 лунок
-        
-        // Начальная позиция на "развернутой" доске
-        int linear_start = is_top_player ? hole : (17 - hole);
-        int final_linear_pos = (linear_start + korgools) % total_positions;
-        
-        // Конвертируем обратно в координаты доски
-        bool lands_on_opponent;
-        int final_hole;
-        
-        if (is_top_player) {
-            if (final_linear_pos < 9) {
-                lands_on_opponent = false;
-                final_hole = final_linear_pos;
-            } else {
-                lands_on_opponent = true;
-                final_hole = 17 - final_linear_pos;
-            }
-        } else {
-            if (final_linear_pos < 9) {
-                lands_on_opponent = true;
-                final_hole = 8 - final_linear_pos;
-            } else {
-                lands_on_opponent = false;
-                final_hole = final_linear_pos - 9;
-            }
-        }
-        
-        // Проверяем условия создания туза
-        if (!lands_on_opponent) return 0.0f; // Не на стороне противника
-        if (final_hole == 8) return 0.0f; // 9-я лунка противника запрещена
-        
-        // Проверяем, будет ли в финальной лунке ровно 3 коргоола
-        int final_count = opp_side[final_hole] + 1;
-        if (final_count != 3) return 0.0f;
-        
-        // Проверяем симметричность (нельзя создать туз симметрично существующему)
-        int opp_tuz = is_top_player ? down_tuz_position : top_tuz_position;
-        if (opp_tuz != -1 && opp_tuz == (8 - final_hole)) {
-            return 0.0f; // Симметричная позиция занята
-        }
-        
-        return 1.0f; // 100% вероятность создания туза
-    }
-    
-    // Генерация ключа для кэша
-    uint64_t generateCacheKey(int hole, bool is_top_player, int korgools) const {
-        uint64_t key = 0;
-        
-        // Упаковываем состояние доски (4 бита на лунку, макс 15 коргоолов)
-        for (int i = 0; i < 9; i++) {
-            key |= (uint64_t(std::min(top[i], 15)) << (i * 4));
-            key |= (uint64_t(std::min(down[i], 15)) << ((i + 9) * 4));
-        }
-        
-        // Добавляем метаданные в старшие биты
-        key |= (uint64_t(hole) << 36);
-        key |= (uint64_t(is_top_player ? 1 : 0) << 40);
-        key |= (uint64_t(top_tuz_position + 1) << 41); // +1 для корректной обработки -1
-        key |= (uint64_t(down_tuz_position + 1) << 45);
-        
-        return key;
-    }
-    
-    // Альтернативный метод с эвристиками для сложных случаев
-    float calculateTuzProbabilityHeuristic(int hole, bool is_top_player) const {
-        const auto& my_side = is_top_player ? top : down;
-        const auto& opp_side = is_top_player ? down : top;
-        
-        int korgools = my_side[hole];
-        
-        // Эвристические оценки на основе паттернов
-        float base_probability = 0.0f;
-        
-        // Ищем лунки противника с 2 коргоолами (потенциальные тузы)
-        for (int i = 0; i < 8; i++) { // исключаем 9-ю лунку
-            if (opp_side[i] == 2) {
-                // Примерная дистанция до цели
-                int approx_distance = std::abs((hole + korgools) % 18 - (9 + i));
-                if (approx_distance <= 2) {
-                    base_probability = std::max(base_probability, 0.8f);
-                } else if (approx_distance <= 4) {
-                    base_probability = std::max(base_probability, 0.4f);
-                } else if (approx_distance <= 6) {
-                    base_probability = std::max(base_probability, 0.2f);
-                }
-            }
-        }
-        
-        return base_probability;
-    }
-
-    float getTuzProbability(int hole, bool is_top_player) const {
-        // Быстрые проверки
-        if (hole == 8) return 0.0f; // Нельзя создать туз в 9-й лунке
-        if (hole < 0 || hole > 8) return 0.0f; // Неверный индекс
-        
-        // Проверяем, есть ли уже туз у игрока
-        if ((is_top_player && top_tuz_position != -1) || 
-            (!is_top_player && down_tuz_position != -1)) {
-            return 0.0f; // У игрока уже есть туз
-        }
-        
-        const auto& my_side = is_top_player ? top : down;
-        int korgools = my_side[hole];
-        
-        if (korgools == 0) return 0.0f; // Нет коргоолов для хода
-        
-        // Проверяем кэш
-        uint64_t cache_key = generateCacheKey(hole, is_top_player, korgools);
-        auto it = tuz_probability_cache.find(cache_key);
-        if (it != tuz_probability_cache.end()) {
-            return it->second;
-        }
-        
-        // Вычисляем вероятность
-        float probability = calculateTuzProbabilityFast(hole, is_top_player, korgools);
-        
-        // Сохраняем в кэш
-        tuz_probability_cache[cache_key] = probability;
-        
-        return probability;
-    }
-    
-    // Получить все вероятности тузов для игрока
-    std::array<float, 9> getAllTuzProbabilities(bool is_top_player) const {
-        std::array<float, 9> probabilities = {0.0f};
-        
-        for (int hole = 0; hole < 9; hole++) {
-            probabilities[hole] = getTuzProbability(hole, is_top_player);
-        }
-        
-        return probabilities;
-    }
-    
-    // Печать всех вероятностей тузов
-    void printTuzProbabilities() const {
-        std::cout << "\n=== TUZ PROBABILITIES ===\n";
-        
-        std::cout << "Player 1 (top):\n";
-        auto top_probs = getAllTuzProbabilities(true);
-        for (int i = 0; i < 9; i++) {
-            if (top_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (top_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        std::cout << "Player 2 (down):\n";
-        auto down_probs = getAllTuzProbabilities(false);
-        for (int i = 0; i < 9; i++) {
-            if (down_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (down_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        // Показываем лучшие ходы
-        auto best_top = getBestTuzMovesVariations(true);
-        auto best_down = getBestTuzMovesVariations(false);
-        
-        if (!best_top.empty()) {
-            std::cout << "\nBest tuz moves for Player 1: ";
-            for (const auto& move : best_top) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-        
-        if (!best_down.empty()) {
-            std::cout << "Best tuz moves for Player 2: ";
-            for (const auto& move : best_down) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-    }
-
-
-
-
-    std::vector<std::pair<int, float>> getBestTuzMovesVariations(bool is_top_player, int top_n = 3)  {
-    
-        std::vector<std::pair<int, float>> moves;
-        for (int hole = 0; hole < 9; hole++) {
-            float prob = getTuzProbability(hole, is_top_player);
-            if (prob > 0.0f) {
-                moves.emplace_back(std::pair {hole, prob});
-            }
-        }
-        
-        // Сортируем по убыванию вероятности
-        std::sort(moves.begin(), moves.end(), 
-                 [](const auto& a, const auto& b) { return a.second > b.second; });
-        
-        // Возвращаем топ N
-        if (moves.size() > static_cast<size_t>(top_n)) {
-            moves.resize(top_n);
-        }
-        
-        return moves;
-    }
-    
-
-    /*
-    // Печать всех вероятностей тузов
-    void printTuzProbabilities() const {
-        std::cout << "\n=== TUZ PROBABILITIES ===\n";
-        
-        std::cout << "Player 1 (top):\n";
-        auto top_probs = getAllTuzProbabilities(true);
-        for (int i = 0; i < 9; i++) {
-            if (top_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (top_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        std::cout << "Player 2 (down):\n";
-        auto down_probs = getAllTuzProbabilities(false);
-        for (int i = 0; i < 9; i++) {
-            if (down_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (down_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        // Показываем лучшие ходы
-        auto best_top = getBestTuzMoves(true);
-        auto best_down = getBestTuzMoves(false);
-        
-        if (!best_top.empty()) {
-            std::cout << "\nBest tuz moves for Player 1: ";
-            for (const auto& move : best_top) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-        
-        if (!best_down.empty()) {
-            std::cout << "Best tuz moves for Player 2: ";
-            for (const auto& move : best_down) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-    }
-
-    */
-    
-    // Очистить кэш (полезно при изменении состояния доски)
-    /*
-    void clearTuzCache() const {
-        tuz_probability_cache.clear();
-    }
-    */
-    
-    // Установить позицию туза
-
-    /*
-    void setTuzPosition(bool is_top_player, int position) {
-        if (is_top_player) {
-            top_tuz_position = position;
-        } else {
-            down_tuz_position = position;
-        }
-        clearTuzCache(); // Очищаем кэш при изменении тузов
-    }
-    */
-
-private:
-    // Быстрый расчет вероятности туза без полной симуляции
-    /*
-    float calculateTuzProbabilityFast(int hole, bool is_top_player, int korgools) const {
-        const auto& opp_side = is_top_player ? down : top;
-        
-        // Для небольшого количества коргоолов используем точную симуляцию
-        if (korgools <= 20) {
-            return simulateExactMovement(hole, is_top_player, korgools);
-        }
-        
-        // Для большого количества используем математический расчет
-        return calculateMathematically(hole, is_top_player, korgools);
-    }
-    */
-
-
-    // Точная симуляция движения (для небольших значений)
-    float simulateExactMovement(int hole, bool is_top_player, int korgools) const {
-        const auto& opp_side = is_top_player ? down : top;
-        
-        int current_pos = hole;
-        bool on_my_side = true;
-        int remaining = korgools;
-        
-        // Симулируем распределение коргоолов
-        while (remaining > 0) {
-            // Переходим к следующей позиции
-            if (on_my_side) {
-                current_pos++;
-                if (current_pos > 8) {
-                    // Переходим на сторону противника, начинаем с правого края (8-я лунка)
-                    on_my_side = false;
-                    current_pos = 8;
-                }
-            } else {
-                current_pos--;
-                if (current_pos < 0) {
-                    // Переходим на свою сторону, начинаем с левого края (0-я лунка)
-                    on_my_side = true;
-                    current_pos = 0;
-                }
-            }
-            remaining--;
-        }
-        
-        return evaluateTuzConditions(current_pos, on_my_side, is_top_player, opp_side);
-    }
-    
-    // Математический расчет для больших значений
-    float calculateMathematically(int hole, bool is_top_player, int korgools) const {
-        const auto& opp_side = is_top_player ? down : top;
-        
-        // Кольцо имеет период 18 (9 позиций на каждой стороне)
-        const int RING_SIZE = 18;
-        
-        // Вычисляем позицию с учетом периодичности
-        int effective_steps = korgools % RING_SIZE;
-        if (effective_steps == 0 && korgools > 0) {
-            effective_steps = RING_SIZE; // Полный оборот
-        }
-        
-        // Теперь симулируем только эффективные шаги
-        return simulateExactMovement(hole, is_top_player, effective_steps);
-    }
-    
-    // Оценка условий создания туза
-    float evaluateTuzConditions(int final_pos, bool on_my_side, bool is_top_player, 
-                               const std::vector<int>& opp_side) const {
-        // Проверяем условия создания туза
-        if (on_my_side) return 0.0f; // Последний коргоол упал на нашу сторону
-        if (final_pos == 8) return 0.0f; // 9-я лунка противника запрещена
-        
-        // Проверяем, будет ли в финальной лунке ровно 3 коргоола после добавления
-        int final_count = opp_side[final_pos] + 1;
-        if (final_count != 3) return 0.0f;
-        
-        // Проверяем симметричность (нельзя создать туз симметрично существующему)
-        int opp_tuz = is_top_player ? down_tuz_position : top_tuz_position;
-        if (opp_tuz != -1 && opp_tuz == (8 - final_pos)) {
-            return 0.0f; // Симметричная позиция занята
-        }
-        
-        return 1.0f; // 100% вероятность создания туза
-    }
-
-
-
-   
-    uint64_t generateCacheKey(int hole, bool is_top_player, int korgools) {
-            uint64_t key = 0;
-            // Упаковываем более эффективно (используем все 64 бита)
-            for (int i = 0; i < 9; i++) key ^= (top[i] + 1) << (i * 3); // 3 бита на лунку (0-7)
-            for (int i = 0; i < 9; i++) key ^= (down[i] + 1) << ((i + 9) * 3);
-            key ^= (uint64_t(hole) << 54);
-            key ^= (uint64_t(is_top_player) << 57);
-            key ^= (uint64_t(top_tuz_position + 1) << 58);
-            key ^= (uint64_t(down_tuz_position + 1) << 61);
-            
-            // Перемешивание
-            key ^= key >> 32;
-            key *= 0xbf58476d1ce4e5b9;
-            key ^= key >> 32;
-            return key;
-
-    }
-
-    
-    // Альтернативный метод с эвристиками для сложных случаев
-    float calculateTuzProbabilityHeuristic(int hole, bool is_top_player) const {
-        const auto& my_side = is_top_player ? top : down;
-        const auto& opp_side = is_top_player ? down : top;
-        
-        int korgools = my_side[hole];
-        
-        // Эвристические оценки на основе паттернов
-        float base_probability = 0.0f;
-        
-        // Ищем лунки противника с 2 коргоолами (потенциальные тузы)
-        for (int i = 0; i < 8; i++) { // исключаем 9-ю лунку
-            if (opp_side[i] == 2) {
-                // Примерная дистанция до цели
-                int approx_distance = std::abs((hole + korgools) % 18 - (9 + i));
-                if (approx_distance <= 2) {
-                    base_probability = std::max(base_probability, 0.8f);
-                } else if (approx_distance <= 4) {
-                    base_probability = std::max(base_probability, 0.4f);
-                } else if (approx_distance <= 6) {
-                    base_probability = std::max(base_probability, 0.2f);
-                }
-            }
-        }
-        
-        return base_probability;
-    }
-
-    
-    float getTuzProbability(int hole, bool is_top_player) const {
-        // Быстрые проверки
-        if (hole == 8) return 0.0f; // Нельзя создать туз в 9-й лунке
-        if (hole < 0 || hole > 8) return 0.0f; // Неверный индекс
-        
-        // Проверяем, есть ли уже туз у игрока
-        if ((is_top_player && top_tuz_position != -1) || 
-            (!is_top_player && down_tuz_position != -1)) {
-            return 0.0f; // У игрока уже есть туз
-        }
-        
-        const auto& my_side = is_top_player ? top : down;
-        int korgools = my_side[hole];
-        
-        if (korgools == 0) return 0.0f; // Нет коргоолов для хода
-        
-        // Проверяем кэш
-        uint64_t cache_key = generateCacheKey(hole, is_top_player, korgools);
-        auto it = tuz_probability_cache.find(cache_key);
-        if (it != tuz_probability_cache.end()) {
-            return it->second;
-        }
-        
-        // Вычисляем вероятность
-        float probability = calculateTuzProbabilityFast(hole, is_top_player, korgools);
-        
-        // Сохраняем в кэш
-        tuz_probability_cache[cache_key] = probability;
-        
-        return probability;
-    }
-    
-    // Получить все вероятности тузов для игрока
-    std::array<float, 9> getAllTuzProbabilities(bool is_top_player) const {
-        std::array<float, 9> probabilities = {0.0f};
-        
-        for (int hole = 0; hole < 9; hole++) {
-            probabilities[hole] = getTuzProbability(hole, is_top_player);
-        }
-        
-        return probabilities;
-    }
-    
-    // Получить лучшие ходы для создания туза
-    /*
-    //
-    std::vector<std::pair<int, float>> getBestTuzMovesVariations(bool is_top_player, int top_n = 3) {
-        std::vector<std::pair<int, float>> moves;
-        
-        for (int hole = 0; hole < 9; hole++) {
-            float prob = getTuzProbability(hole, is_top_player);
-            if (prob > 0.0f) {
-                moves.push_back(std::pair{hole, prob});
-            }
-        }
-        
-        // Сортируем по убыванию вероятности
-        std::sort(moves.begin(), moves.end(), 
-                 [](const auto& a, const auto& b) { return a.second > b.second; });
-        
-        // Возвращаем топ N
-        if (moves.size() > static_cast<size_t>(top_n)) {
-            moves.resize(top_n);
-        }
-        
-        return moves;
-    }
-    */
-
-
-    // Печать всех вероятностей тузов
-    /*
-    void printTuzProbabilities() const {
-        std::cout << "\n=== TUZ PROBABILITIES ===\n";
-        
-        std::cout << "Player 1 (top):\n";
-        auto top_probs = getAllTuzProbabilities(true);
-        for (int i = 0; i < 9; i++) {
-            if (top_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (top_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        std::cout << "Player 2 (down):\n";
-        auto down_probs = getAllTuzProbabilities(false);
-        for (int i = 0; i < 9; i++) {
-            if (down_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (down_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        // Показываем лучшие ходы
-        auto best_top = getBestTuzMovesVariations(true);
-        auto best_down = getBestTuzMovesVariations(false);
-        
-        if (!best_top.empty()) {
-            std::cout << "\nBest tuz moves for Player 1: ";
-            for (const auto& move : best_top) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-        
-        if (!best_down.empty()) {
-            std::cout << "Best tuz moves for Player 2: ";
-            for (const auto& move : best_down) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-    }
-    */
-
-    // Очистить кэш (полезно при изменении состояния доски)
-    void clearTuzCache() {
-        tuz_probability_cache.clear();
-    }
-    
-    // Установить позицию туза
-    void setTuzPosition(bool is_top_player, int position) {
-        if (is_top_player) {
-            top_tuz_position = position;
-        } else {
-            down_tuz_position = position;
-        }
-        clearTuzCache(); // Очищаем кэш при изменении тузов
-    }
-    
-    // Получить лучшие ходы для создания туза
-    /*
-    std::vector<std::pair<int, float>> getBestTuzMoves(bool is_top_player, int top_n = 3) const {
-        std::vector<std::pair<int, float>> moves;
-        
-        for (int hole = 0; hole < 9; hole++) {
-            float prob = getTuzProbability(hole, is_top_player);
-            if (prob > 0.0f) {
-                moves.emplace_back(hole, prob);
-            }
-        }
-        
-        // Сортируем по убыванию вероятности
-        std::sort(moves.begin(), moves.end(), 
-                 [](const auto& a, const auto& b) { return a.second > b.second; });
-        
-        // Возвращаем топ N
-        if (moves.size() > static_cast<size_t>(top_n)) {
-            moves.resize(top_n);
-        }
-        
-        return moves;
-    }
-    */
-    
-    // Печать всех вероятностей тузов
-    void printTuzProbabilities() {
-        std::cout << "\n=== TUZ PROBABILITIES ===\n";
-        
-        std::cout << "Player 1 (top):\n";
-        auto top_probs = getAllTuzProbabilities(true);
-        for (int i = 0; i < 9; i++) {
-            if (top_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (top_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        std::cout << "Player 2 (down):\n";
-        auto down_probs = getAllTuzProbabilities(false);
-        for (int i = 0; i < 9; i++) {
-            if (down_probs[i] > 0.0f) {
-                std::cout << "  Hole " << i << ": " << (down_probs[i] * 100) << "%\n";
-            }
-        }
-        
-        // Показываем лучшие ходы
-        std::vector<std::pair<int, float>> best_top = getBestTuzMovesVariations(true, 3);
-        std::vector<std::pair<int, float>> best_down = getBestTuzMovesVariations(false, 3);
-
-
-        if (!best_top.empty()) {
-            std::cout << "\nBest tuz moves for Player 1: ";
-            for (const auto& move : best_top) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-        
-        if (!best_down.empty()) {
-            std::cout << "Best tuz moves for Player 2: ";
-            for (const auto& move : best_down) {
-                std::cout << "hole " << move.first << " (" << (move.second * 100) << "%) ";
-            }
-            std::cout << "\n";
-        }
-    }
-    
-    // Очистить кэш (полезно при изменении состояния доски)
-    /*
-    void clearTuzCache() const {
-        tuz_probability_cache.clear();
-    }
-    */
-    
-    // Установить позицию туза
-private:
-    // Быстрый расчет вероятности туза без полной симуляции
-    float calculateTuzProbabilityFast(int hole, bool is_top_player, int korgools) const {
-        const auto& opp_side = is_top_player ? down : top;
-        
-        // Вычисляем финальную позицию математически
-        int total_positions = 18; // 9 + 9 лунок
-        
-        // Начальная позиция на "развернутой" доске
-        int linear_start = is_top_player ? hole : (17 - hole);
-        int final_linear_pos = (linear_start + korgools) % total_positions;
-        
-        // Конвертируем обратно в координаты доски
-        bool lands_on_opponent;
-        int final_hole;
-        
-        if (is_top_player) {
-            if (final_linear_pos < 9) {
-                lands_on_opponent = false;
-                final_hole = final_linear_pos;
-            } else {
-                lands_on_opponent = true;
-                final_hole = 17 - final_linear_pos;
-            }
-        } else {
-            if (final_linear_pos < 9) {
-                lands_on_opponent = true;
-                final_hole = 8 - final_linear_pos;
-            } else {
-                lands_on_opponent = false;
-                final_hole = final_linear_pos - 9;
-            }
-        }
-        
-        // Проверяем условия создания туза
-        if (!lands_on_opponent) return 0.0f; // Не на стороне противника
-        if (final_hole == 8) return 0.0f; // 9-я лунка противника запрещена
-        
-        // Проверяем, будет ли в финальной лунке ровно 3 коргоола
-        int final_count = opp_side[final_hole] + 1;
-        if (final_count != 3) return 0.0f;
-        
-        // Проверяем симметричность (нельзя создать туз симметрично существующему)
-        int opp_tuz = is_top_player ? down_tuz_position : top_tuz_position;
-        if (opp_tuz != -1 && opp_tuz == (8 - final_hole)) {
-            return 0.0f; // Симметричная позиция занята
-        }
-        
-        return 1.0f; // 100% вероятность создания туза
-    }
-    
-    // Генерация ключа для кэша
-    uint64_t generateCacheKey(int hole, bool is_top_player, int korgools) const {
-        uint64_t key = 0;
-        
-        // Упаковываем состояние доски (4 бита на лунку, макс 15 коргоолов)
-        for (int i = 0; i < 9; i++) {
-            key |= (uint64_t(std::min(top[i], 15)) << (i * 4));
-            key |= (uint64_t(std::min(down[i], 15)) << ((i + 9) * 4));
-        }
-        
-        // Добавляем метаданные в старшие биты
-        key |= (uint64_t(hole) << 36);
-        key |= (uint64_t(is_top_player ? 1 : 0) << 40);
-        key |= (uint64_t(top_tuz_position + 1) << 41); // +1 для корректной обработки -1
-        key |= (uint64_t(down_tuz_position + 1) << 45);
-        
-        return key;
-    }
-    
-    // Альтернативный метод с эвристиками для сложных случаев
-    /*
-    float calculateTuzProbabilityHeuristic(int hole, bool is_top_player) const {
-        const auto& my_side = is_top_player ? top : down;
-        const auto& opp_side = is_top_player ? down : top;
-        
-        int korgools = my_side[hole];
-        
-        // Эвристические оценки на основе паттернов
-        float base_probability = 0.0f;
-        
-        // Ищем лунки противника с 2 коргоолами (потенциальные тузы)
-        for (int i = 0; i < 8; i++) { // исключаем 9-ю лунку
-            if (opp_side[i] == 2) {
-                // Примерная дистанция до цели
-                int approx_distance = std::abs((hole + korgools) % 18 - (9 + i));
-                if (approx_distance <= 2) {
-                    base_probability = std::max(base_probability, 0.8f);
-                } else if (approx_distance <= 4) {
-                    base_probability = std::max(base_probability, 0.4f);
-                } else if (approx_distance <= 6) {
-                    base_probability = std::max(base_probability, 0.2f);
-                }
-            }
-        }
-        
-        return base_probability;
-    }
-    */
-
-/*
-    void print() const {
-        std::cout << "Player 1 (top, kazan: " << top_kazan << "): ";
-        for (size_t i = 0; i < top.size(); ++i) {
-            std::cout << "[" << i << "]" << top[i] << " ";
-        }
-        std::cout << "\nPlayer 2 (down, kazan: " << down_kazan << "): ";
-        for (size_t i = 0; i < down.size(); ++i) {
-            std::cout << "[" << i << "]" << down[i] << " ";
-        }
-        std::cout << "\n";
-    }
-
-        std::vector<int> transformToSingleVector() const {
-        std::vector<int> result;
-        result.insert(result.end(), top.begin(), top.end());
-        result.insert(result.end(), down.begin(), down.end());
-        
-        return result;
-    }
-*/
-
 };
 
 // Состояния игры
@@ -1050,11 +275,6 @@ enum class GameStatus {
     DRAW,                  // Ничья
     ABANDONED              // Игра прервана
 };
-
-
-
-
-
 
 class ToguzKorgoolGame {
 private:
@@ -1087,7 +307,6 @@ private:
         int position;
         bool is_opponent_side;
     };
-
 
     // Исправленная функция распределения коргоолов с учетом тузов
     LastPosition distribute_korgools(int korgools, int start_pos, bool is_top_player) {
@@ -1278,7 +497,6 @@ public:
         board = std::make_shared<Ring>();
         start_time = std::chrono::steady_clock::now();
     }
-
 
     std::shared_ptr<Ring> get_board() {
         return board;
@@ -1519,8 +737,6 @@ struct GameStatistics {
     double tuz_kazan_percentage_p2 = 0.0;
 };
 
-
-
 class GameEvaluator {
 private:
     ToguzKorgoolGame* game;
@@ -1549,7 +765,6 @@ public:
         
         // 3. Оценка по распределению коргоолов на доске
         auto& my_side = for_top_player ? game->get_board()->top : game->get_board()->down;
-        //game->
         auto& opp_side = for_top_player ? game->get_board()->down : game->get_board()->top;
         
         int my_total = 0;
@@ -1579,7 +794,6 @@ public:
         return score;
     }
 };
-
 
 class MoveSelector {
 private:
@@ -1657,7 +871,6 @@ private:
     }
     
     float calculateTuzProb(int hole, bool is_top_player) {
-
         if (hole == 8) return 0.0f;
     
         auto tuz_pos = game->get_tuz_positions();
@@ -1706,28 +919,6 @@ private:
         
         int final_count = opp_side[final_hole] + 1;
         return (final_count == 3) ? 1.0f : 0.0f;
-
-        /*
-        // Вероятность получить туз при данном ходе
-        // Туз можно получить только на стороне противника и не в 9-й лунке
-        if (hole == 8) return 0.0f; // Нельзя в 9-й лунке
-        
-        auto tuz_pos = game->get_tuz_positions();
-        int my_tuz = is_top_player ? tuz_pos.first : tuz_pos.second;
-        
-        // Если уже есть туз, новый получить нельзя
-        if (my_tuz != -1) return 0.0f;
-        
-        const auto& side = is_top_player ? game->get_board()->top : game->get_board()->down;
-        int korgools = side[hole];
-        
-        // Эвристика: вероятность выше для ходов с 3 коргоолами
-        if (korgools == 3) return 0.4f;
-        if (korgools == 2 || korgools == 4) return 0.2f;
-        return 0.05f;
-        */
-
-
     }
     
     float calculateExpectedGain(int hole, bool is_top_player) {
@@ -1752,10 +943,6 @@ private:
         return avg_gain * (0.5f + 0.1f * korgools);
     }
 };
-
-
-
-
 
 // Класс для управления играми
 class GameManager {
@@ -1793,7 +980,6 @@ public:
         return game_id;
     }
 
-
     void play_ai_game(int game_id, bool show_moves = false) {
         ToguzKorgoolGame* game = get_game(game_id);
         if (!game) {
@@ -1815,7 +1001,6 @@ public:
         while (!game->is_game_over()) {
             // Выбираем ход с помощью ИИ
             int chosen_move = selector.selectBestMove(current_player_top);
-            std::cout << "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW" << chosen_move << std::endl;
             
             if (chosen_move == -1) {
                 if (show_moves) {
@@ -2052,20 +1237,6 @@ public:
             
             total_moves_p1 += top_gains.size();
             total_moves_p2 += down_gains.size();
-
-            std::cout << "************top***************************************" << std::endl;
-            for (const auto& gain : top_gains) {
-                std::cout << gain << " ";
-            }
-            std::cout << std::endl;
-
-            std::cout << "************down*************************************" << std::endl;
-            for (const auto& gain : down_gains) {
-                std::cout << gain << " ";
-            }
-            std::cout << std::endl;
-
-
         }
         
         // Средние значения
@@ -2207,10 +1378,6 @@ public:
         std::cout << "Total kazan via tuz P2: " << stats.total_tuz_kazan_gain_p2 
                   << " (" << std::fixed << std::setprecision(1) << stats.tuz_kazan_percentage_p2 << "% of total)\n";
         std::cout.unsetf(std::ios::fixed);
-
-        
-        //for (const auto& move_grade : stats)
-
     }
 
     void play_automatic_game(int game_id, bool show_moves = false) {
@@ -2230,9 +1397,6 @@ public:
         bool current_player_top = true;
         std::uniform_int_distribution<> delay_dist(1, 5);
 
-        
-
-
         while (!game->is_game_over()) {
             // Получаем доступные ходы для текущего игрока
             std::vector<int> available_moves = game->get_available_moves(current_player_top);
@@ -2246,7 +1410,6 @@ public:
 
             // Выбираем случайный ход
             std::uniform_int_distribution<> move_dist(0, available_moves.size() - 1);
-
             int chosen_move = available_moves[move_dist(random_gen)];
 
             // Выполняем ход
@@ -2350,8 +1513,6 @@ public:
     }
 };
 
-
-
 // Структура для хранения параметров модели
 struct ModelParameters {
     // Веса для оценки позиции
@@ -2411,16 +1572,9 @@ public:
         std::vector<float> activations = input;
         
         for (size_t i = 0; i < weights.size(); ++i) {
-        
             const auto& layer_weights = weights[i];
             const auto& layer_biases = biases[i];
-        
-            std::cout << "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%" << std::endl;
-            // std::println is not available in C++20, using std::cout instead
-            // std::println("{}", layer_weights);
-            // std::println("{}", layer_biases);
-
-            std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@" << std::endl;
+            
             int prev_size = activations.size();
             int curr_size = layer_biases.size();
             
@@ -2465,8 +1619,6 @@ public:
         // (упрощенная версия для демонстрации)
         for (int epoch = 0; epoch < epochs; ++epoch) {
             for (size_t i = 0; i < inputs.size(); ++i) {
-
-                
                 // Прямой проход и расчет градиентов
                 // Обратный проход и обновление весов
                 // (полная реализация требует больше кода)
@@ -2476,7 +1628,6 @@ public:
     
     void save(const std::string& filename) {
         std::ofstream out(filename, std::ios::binary);
-
         // Реализация сохранения весов
     }
     
@@ -2511,15 +1662,12 @@ public:
     
     void save(const std::string& filename) {
         std::ofstream out(filename);
-        std::cout << "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@save@@@@@@@@@@@@@@@@@" << std::endl;
         for (const auto& entry : positions) {
-            std::cout << entry.first << " " << entry.second.first << " " << entry.second.second << std::endl;
             out << entry.first << " " << entry.second.first << " " << entry.second.second << "\n";
         }
     }
     
     void load(const std::string& filename) {
-        std::cout << "___________________________LOAD________________________________" << std::endl;
         std::ifstream in(filename);
         std::string hash;
         float eval;
@@ -2530,21 +1678,6 @@ public:
         }
     }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 class AIModelTrainer {
 private:
@@ -2850,14 +1983,11 @@ private:
     }
 };
 
-
-
 int main() {
-
     GameManager game_manager;
     
     // 1. Создаем и играем автоматические игры для сбора статистики
-    game_manager.create_and_play_multiple_games(100, false);
+    game_manager.create_and_play_multiple_games(10, false);
     
     // 2. Анализируем статистику
     GameStatistics stats = game_manager.get_statistics();
@@ -2868,7 +1998,7 @@ int main() {
     trainer.save_model("toguz_korgool_model_v1.bin");
     
     // 4. Обучение с подкреплением
-    ReinforcementTrainer rl_trainer(game_manager, trainer, 500);
+    ReinforcementTrainer rl_trainer(game_manager, trainer, 5);
     rl_trainer.train();
     
     // 5. Тестируем обученную модель
@@ -2877,49 +2007,6 @@ int main() {
     
     // 6. Сохраняем финальную модель
     trainer.save_model("toguz_korgool_model_final.bin");
-
-    /*
-    GameManager game_manager;
-    
-    std::cout << "=== Toguz Korgool Game Manager with Fixed TUZ Logic ===\n";
-    std::cout << "Movement: Counter-clockwise (against the clock)\n";
-    std::cout << "Top side: moves left to right (0→1→2→...→8)\n";
-    std::cout << "Down side: moves right to left (8→7→6→...→0)\n";
-    std::cout << "TUZ Logic: -1 = no tuz, 0-8 = tuz position\n\n";
-    
-    // Установка начального ID
-    game_manager.set_last_game_id_from_db(100);
-    
-    // Создаем и запускаем несколько автоматических игр
-    game_manager.create_and_play_multiple_games(100, true);
-    
-    std::cout << "\n=== Creating more games for statistics ===\n";
-    
-    // Создаем еще больше игр для демонстрации
-    game_manager.create_and_play_multiple_games(50, false);
-    
-    // Показываем финальную статистику
-    std::cout << "\n=== Final Statistics ===\n";
-    game_manager.show_games_stats();
-    
-    // Демонстрация поиска игр по статусу
-    std::cout << "\n=== Games by Status ===\n";
-    auto finished_games = game_manager.get_games_by_status(GameStatus::PLAYER1_WINS);
-    std::cout << "Player 1 wins: " << finished_games.size() << "\n";
-    
-    finished_games = game_manager.get_games_by_status(GameStatus::PLAYER2_WINS);
-    std::cout << "Player 2 wins: " << finished_games.size() << "\n";
-    
-    finished_games = game_manager.get_games_by_status(GameStatus::DRAW);
-    std::cout << "Draws: " << finished_games.size() << "\n";
-    
-    game_manager.show_comprehensive_statistics();
-    
-    // Очищаем завершенные игры
-    std::cout << "\n=== Removing finished games ===\n";
-    game_manager.remove_finished_games();
-    game_manager.show_games_stats();
-    */
 
     return 0;
 }
